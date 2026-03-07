@@ -1,0 +1,113 @@
+name: SSC Build Pipeline
+
+on:
+  push:
+    branches: ["main"]
+
+  workflow_dispatch:
+    inputs:
+      package_file:
+        description: "Enter package file name (e.g. animejs-3.2.1.tgz)"
+        required: true
+        default: "animejs-3.2.1.tgz"
+
+permissions:
+  contents: write
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    # ================= Checkout =================
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    # ================= Setup Python =================
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    # ================= Install Dependencies =================
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    # ================= Download NLTK =================
+    - name: Download NLTK Data
+      run: |
+        python - <<EOF
+        import nltk
+        nltk.download("stopwords")
+        EOF
+
+    # ================= Detect Selected Package =================
+    - name: Detect Selected Package
+      id: detect_pkg
+      run: |
+        FILE="${{ github.event.inputs.package_file }}"
+
+        if [ ! -f "$FILE" ]; then
+          echo "File not found: $FILE"
+          exit 1
+        fi
+
+        echo "Detected package: $FILE"
+        echo "package_path=$FILE" >> $GITHUB_OUTPUT
+
+    # ================= ML Security Gate =================
+    - name: ML Security Gate
+      id: ml_scan
+      continue-on-error: true
+      run: |
+        export PYTHONPATH=$PYTHONPATH:$(pwd)
+        python -m scripts.run_analysis "${{ steps.detect_pkg.outputs.package_path }}"
+
+    # ================= Move to Decoy =================
+    - name: Move to Decoy
+      if: steps.ml_scan.outcome == 'failure'
+      run: |
+        mkdir -p packages/decoy
+        mv "${{ steps.detect_pkg.outputs.package_path }}" \
+           packages/decoy/package_${{ github.run_number }}.tgz
+
+    # ================= Build Sandbox =================
+    - name: Build Sandbox Image
+      if: steps.ml_scan.outcome == 'failure'
+      run: |
+        docker build -t ssc-sandbox -f sandbox/Dockerfile .
+
+    # ================= Dynamic Analysis =================
+    - name: Run Dynamic Analysis
+      if: steps.ml_scan.outcome == 'failure'
+      continue-on-error: true
+      run: |
+        docker run --rm \
+          -v ${{ github.workspace }}:/app \
+          ssc-sandbox \
+          python sandbox/runner.py \
+          packages/decoy/package_${{ github.run_number }}.tgz
+
+    # ================= Publish Benign =================
+    - name: Publish Package
+      if: steps.ml_scan.outcome == 'success'
+      run: |
+        mkdir -p packages/releases
+        mv "${{ steps.detect_pkg.outputs.package_path }}" \
+           packages/releases/package_${{ github.run_number }}.tgz
+
+    # ================= Commit Results =================
+    - name: Commit Results
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        git add packages/
+        git add decoy_logs/ || true
+
+        git commit -m "SSC pipeline result (run ${{ github.run_number }})" || echo "Nothing to commit"
+
+        git pull --rebase origin main || true
+        git push origin main

@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>SSC Risk Intelligence Dashboard</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<style>
+body {
+    background:#0f172a;
+    color:white;
+    font-family:Arial;
+    padding:30px;
+}
+.card {
+    background:#1e293b;
+    padding:20px;
+    border-radius:12px;
+    margin-bottom:25px;
+}
+.high { color:#ff4d4d; }
+.medium { color:#ffcc00; }
+.low { color:#4dff88; }
+
+.mitre-tag {
+    background:#111827;
+    padding:8px 12px;
+    margin:6px 0;
+    border-radius:8px;
+    border-left:4px solid #3b82f6;
+    font-size:14px;
+}
+
+.timeline-item {
+    border-left:3px solid #3b82f6;
+    padding-left:10px;
+    margin-bottom:10px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>🛡 SSC Risk Intelligence Dashboard</h1>
+
+<div class="card">
+    <h2>Threat Score</h2>
+    <canvas id="gauge" height="120"></canvas>
+</div>
+
+<div class="card">
+    <h2>Risk Trend (Last Runs)</h2>
+    <canvas id="trendChart" height="80"></canvas>
+</div>
+
+<div class="card">
+    <h2>Entropy</h2>
+    <canvas id="entropyChart" height="80"></canvas>
+</div>
+
+<div class="card">
+    <h2>Suspicious Indicators</h2>
+    <div id="suspiciousPanel"></div>
+</div>
+
+<!--  MITRE ATT&CK PANEL -->
+<div class="card">
+    <h2> MITRE ATT&CK Mapping</h2>
+    <div id="mitrePanel"></div>
+</div>
+
+<div class="card">
+    <h2>Execution Timeline</h2>
+    <div id="timeline"></div>
+</div>
+
+<script>
+
+let gaugeChart, entropyChart, trendChart;
+
+async function safeFetch(url) {
+    try {
+        const res = await fetch(url + "?t=" + new Date().getTime());
+        if (!res.ok) return null;
+        return await res.json();
+    } catch {
+        return null;
+    }
+}
+
+async function loadData() {
+
+    const latest = await safeFetch("decoy_logs/latest.json");
+    const history = await safeFetch("decoy_logs/history.json");
+
+    if (!latest) {
+        document.getElementById("suspiciousPanel").innerHTML =
+            "<span class='low'>Waiting for first pipeline run...</span>";
+        return;
+    }
+
+    renderGauge(latest.behavior_score || 0);
+    renderEntropy(latest.file_entropy || 0);
+    renderTrend(history || []);
+
+    const suspicious = [
+        ...(latest.suspicious_imports || []),
+        ...(latest.command_injection_calls || []),
+        ...(latest.obfuscation_flags || [])
+    ];
+
+    renderSuspicious(suspicious);
+    renderMitre(latest.mitre_techniques || []);
+
+    const events = (latest.system_calls_detected || []).map(call => ({
+        event: "System Call",
+        detail: call,
+        timestamp: latest.timestamp
+    }));
+
+    renderTimeline(events);
+}
+
+function renderGauge(score) {
+
+    if (gaugeChart) gaugeChart.destroy();
+
+    gaugeChart = new Chart(document.getElementById('gauge'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Risk','Remaining'],
+            datasets: [{
+                data: [score, 10-score],
+                backgroundColor: [
+                    score >= 7 ? '#ff4d4d' :
+                    score >= 4 ? '#ffcc00' : '#4dff88',
+                    '#1e293b'
+                ]
+            }]
+        },
+        options: { cutout: '70%' }
+    });
+}
+
+function renderEntropy(entropy) {
+
+    if (entropyChart) entropyChart.destroy();
+
+    entropyChart = new Chart(document.getElementById('entropyChart'), {
+        type:'bar',
+        data:{
+            labels:['Entropy'],
+            datasets:[{
+                label:'Entropy',
+                data:[entropy],
+                backgroundColor:'#3b82f6'
+            }]
+        },
+        options:{ scales:{ y:{ min:0, max:8 } } }
+    });
+}
+
+function renderTrend(history) {
+
+    if (!history || history.length === 0) return;
+
+    if (trendChart) trendChart.destroy();
+
+    const labels = history.map(h => h.run_id);
+    const scores = history.map(h => h.behavior_score);
+
+    trendChart = new Chart(document.getElementById('trendChart'), {
+        type:'line',
+        data:{
+            labels: labels,
+            datasets:[{
+                label:'Behavior Score',
+                data: scores,
+                borderColor:'#3b82f6',
+                backgroundColor:'rgba(59,130,246,0.2)',
+                fill:true,
+                tension:0.3
+            }]
+        },
+        options:{ scales:{ y:{ min:0, max:10 } } }
+    });
+}
+
+function renderSuspicious(list) {
+    const panel = document.getElementById('suspiciousPanel');
+    panel.innerHTML = "";
+
+    if(!list || list.length === 0){
+        panel.innerHTML = "<span class='low'>No suspicious indicators detected</span>";
+        return;
+    }
+
+    list.forEach(item => {
+        panel.innerHTML += `<div class='medium'>⚠ ${item}</div>`;
+    });
+}
+
+function renderMitre(list) {
+    const panel = document.getElementById('mitrePanel');
+    panel.innerHTML = "";
+
+    if(!list || list.length === 0){
+        panel.innerHTML = "<span class='low'>No MITRE techniques mapped</span>";
+        return;
+    }
+
+    list.forEach(item => {
+        panel.innerHTML += `
+            <div class="mitre-tag">
+                 ${item}
+            </div>
+        `;
+    });
+}
+
+function renderTimeline(events) {
+    const container = document.getElementById('timeline');
+    container.innerHTML = "";
+
+    if(!events || events.length === 0){
+        container.innerHTML = "<span class='low'>No significant activity</span>";
+        return;
+    }
+
+    events.forEach(e => {
+        container.innerHTML += `
+            <div class="timeline-item">
+                <strong>${e.event}</strong><br>
+                ${e.detail}<br>
+                <small>${e.timestamp}</small>
+            </div>
+        `;
+    });
+}
+
+loadData();
+setInterval(loadData, 10000);
+
+</script>
+
+</body>
+</html>

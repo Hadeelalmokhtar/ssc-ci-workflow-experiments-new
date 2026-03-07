@@ -1,0 +1,967 @@
+[
+    {
+        "run_id": "1771945812",
+        "package": "packages/decoy/package_166.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.035,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_166.py\"], 0x7ffc4a0c5b30 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-24T15:10:12.261242"
+    },
+    {
+        "run_id": "168",
+        "package": "build/package.py",
+        "risk_probability": 0.9763720631599426,
+        "prediction": 1,
+        "file_entropy": 3.9679,
+        "execution_time": 0.16,
+        "exit_code": 0,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/opt/hostedtoolcache/Python/3.11.14/x64/bin/python\", [\"python\", \"build/package.py\"], 0x7fff85b47c50 /* 120 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-24T15:16:35.691097"
+    },
+    {
+        "run_id": "1771946246",
+        "package": "packages/decoy/package_168.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.036,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_168.py\"], 0x7ffcb391f740 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-24T15:17:26.438429"
+    },
+    {
+        "run_id": "169",
+        "package": "build/package.py",
+        "risk_probability": 0.9763720631599426,
+        "prediction": 1,
+        "file_entropy": 4.6288,
+        "execution_time": 0.202,
+        "exit_code": 1,
+        "suspicious_imports": [
+            "os",
+            "subprocess",
+            "socket",
+            "requests"
+        ],
+        "command_injection_calls": [
+            "system"
+        ],
+        "obfuscation_flags": [
+            "hex encoded string"
+        ],
+        "system_calls_detected": [
+            "execve(\"/opt/hostedtoolcache/Python/3.11.14/x64/bin/python\", [\"python\", \"build/package.py\"], 0x7ffe41b11da0 /* 120 vars */) = 0"
+        ],
+        "behavior_score": 9,
+        "mitre_techniques": [
+            {
+                "technique": "Command and Scripting Interpreter",
+                "id": "T1059",
+                "tactic": "Execution"
+            },
+            {
+                "technique": "Obfuscated Files or Information",
+                "id": "T1027",
+                "tactic": "Defense Evasion"
+            },
+            {
+                "technique": "User Execution",
+                "id": "T1204",
+                "tactic": "Execution"
+            }
+        ],
+        "timestamp": "2026-02-25T04:25:23.911740"
+    },
+    {
+        "run_id": "1771993573",
+        "package": "packages/decoy/package_169.py",
+        "file_entropy": 4.6288,
+        "execution_time": 0.073,
+        "suspicious_imports": [
+            "os",
+            "subprocess",
+            "socket",
+            "requests"
+        ],
+        "command_injection_calls": [
+            "system"
+        ],
+        "obfuscation_flags": [
+            "hex encoded string"
+        ],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_169.py\"], 0x7ffd1252f740 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 9,
+        "mitre_techniques": [
+            "T1059 - Command and Scripting Interpreter",
+            "T1027 - Obfuscated Files or Information",
+            "T1204 - User Execution"
+        ],
+        "timestamp": "2026-02-25T04:26:13.067280"
+    },
+    {
+        "run_id": "174",
+        "package": "build/package.py",
+        "risk_probability": 0.9763720631599426,
+        "prediction": 1,
+        "file_entropy": 3.9679,
+        "execution_time": 0.357,
+        "exit_code": 0,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/opt/hostedtoolcache/Python/3.11.14/x64/bin/python\", [\"python\", \"build/package.py\"], 0x7ffff5a08d70 /* 120 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T04:28:00.308172"
+    },
+    {
+        "run_id": "1771993731",
+        "package": "packages/decoy/package_174.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.04,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_174.py\"], 0x7ffd2096ba60 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T04:28:51.214371"
+    },
+    {
+        "run_id": "175",
+        "package": "build/package.py",
+        "risk_probability": 0.9763720631599426,
+        "prediction": 1,
+        "file_entropy": 3.9679,
+        "execution_time": 0.114,
+        "exit_code": 0,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/opt/hostedtoolcache/Python/3.11.14/x64/bin/python\", [\"python\", \"build/package.py\"], 0x7ffd0c607170 /* 120 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T04:41:11.134277"
+    },
+    {
+        "run_id": "1771994523",
+        "package": "packages/decoy/package_175.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.034,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_175.py\"], 0x7fff3c29d0d0 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T04:42:03.532132"
+    },
+    {
+        "run_id": "177",
+        "package": "build/package.py",
+        "risk_probability": 0.9763720631599426,
+        "prediction": 1,
+        "file_entropy": 3.9679,
+        "execution_time": 0.156,
+        "exit_code": 0,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/opt/hostedtoolcache/Python/3.11.14/x64/bin/python\", [\"python\", \"build/package.py\"], 0x7ffde915ed60 /* 120 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T04:53:44.794173"
+    },
+    {
+        "run_id": "1771995278",
+        "package": "packages/decoy/package_177.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.035,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_177.py\"], 0x7ffc6e1a0700 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T04:53:23.657817"
+    },
+    {
+        "run_id": "178",
+        "package": "build/package.py",
+        "risk_probability": 0.9763720631599426,
+        "prediction": 1,
+        "file_entropy": 3.9679,
+        "execution_time": 0.244,
+        "exit_code": 0,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/opt/hostedtoolcache/Python/3.11.14/x64/bin/python\", [\"python\", \"build/package.py\"], 0x7ffd19d6cea0 /* 120 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T04:54:33.748684"
+    },
+    {
+        "run_id": "1771995324",
+        "package": "packages/decoy/package_178.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.037,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_178.py\"], 0x7ffcbdefb660 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T04:55:24.815486"
+    },
+    {
+        "run_id": "180",
+        "package": "build/package.py",
+        "risk_probability": 0.9763720631599426,
+        "prediction": 1,
+        "file_entropy": 3.9679,
+        "execution_time": 0.475,
+        "exit_code": 0,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/opt/hostedtoolcache/Python/3.11.14/x64/bin/python\", [\"python\", \"build/package.py\"], 0x7ffdea127090 /* 120 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T05:27:07.983230"
+    },
+    {
+        "run_id": "1771997280",
+        "package": "packages/decoy/package_180.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.034,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_180.py\"], 0x7ffc709e3140 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T05:28:00.872469"
+    },
+    {
+        "run_id": "182",
+        "package": "build/package.py",
+        "risk_probability": 0.9763720631599426,
+        "prediction": 1,
+        "file_entropy": 3.9679,
+        "execution_time": 0.104,
+        "exit_code": 0,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/opt/hostedtoolcache/Python/3.11.14/x64/bin/python\", [\"python\", \"build/package.py\"], 0x7ffdebbe6010 /* 120 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T05:28:38.603918"
+    },
+    {
+        "run_id": "1771997369",
+        "package": "packages/decoy/package_182.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.035,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_182.py\"], 0x7fff02789660 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T05:29:29.708965"
+    },
+    {
+        "run_id": "183",
+        "package": "build/package.py",
+        "risk_probability": 0.9763720631599426,
+        "prediction": 1,
+        "file_entropy": 3.9679,
+        "execution_time": 0.115,
+        "exit_code": 0,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/opt/hostedtoolcache/Python/3.11.14/x64/bin/python\", [\"python\", \"build/package.py\"], 0x7ffeff16aa30 /* 120 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T05:33:53.063732"
+    },
+    {
+        "run_id": "1771997682",
+        "package": "packages/decoy/package_183.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.038,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_183.py\"], 0x7ffc72d97980 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T05:34:42.009723"
+    },
+    {
+        "run_id": "184",
+        "package": "build/package.py",
+        "risk_probability": 0.9763720631599426,
+        "prediction": 1,
+        "file_entropy": 4.6279,
+        "execution_time": 0.288,
+        "exit_code": 1,
+        "suspicious_imports": [
+            "os",
+            "subprocess",
+            "socket",
+            "requests"
+        ],
+        "command_injection_calls": [
+            "system"
+        ],
+        "obfuscation_flags": [
+            "hex encoded string"
+        ],
+        "system_calls_detected": [
+            "execve(\"/opt/hostedtoolcache/Python/3.11.14/x64/bin/python\", [\"python\", \"build/package.py\"], 0x7ffecfd43860 /* 120 vars */) = 0"
+        ],
+        "behavior_score": 9,
+        "mitre_techniques": [
+            {
+                "technique": "Command and Scripting Interpreter",
+                "id": "T1059",
+                "tactic": "Execution"
+            },
+            {
+                "technique": "Obfuscated Files or Information",
+                "id": "T1027",
+                "tactic": "Defense Evasion"
+            },
+            {
+                "technique": "User Execution",
+                "id": "T1204",
+                "tactic": "Execution"
+            }
+        ],
+        "timestamp": "2026-02-25T05:36:08.956054"
+    },
+    {
+        "run_id": "1771997819",
+        "package": "packages/decoy/package_184.py",
+        "file_entropy": 4.6279,
+        "execution_time": 0.078,
+        "suspicious_imports": [
+            "os",
+            "subprocess",
+            "socket",
+            "requests"
+        ],
+        "command_injection_calls": [
+            "system"
+        ],
+        "obfuscation_flags": [
+            "hex encoded string"
+        ],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_184.py\"], 0x7ffc72f69030 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 9,
+        "mitre_techniques": [
+            "T1059 - Command and Scripting Interpreter",
+            "T1027 - Obfuscated Files or Information",
+            "T1204 - User Execution"
+        ],
+        "timestamp": "2026-02-25T05:36:59.139646"
+    },
+    {
+        "run_id": "185",
+        "package": "build/package.py",
+        "risk_probability": 0.9763720631599426,
+        "prediction": 1,
+        "file_entropy": 3.9679,
+        "execution_time": 0.283,
+        "exit_code": 0,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/opt/hostedtoolcache/Python/3.11.14/x64/bin/python\", [\"python\", \"build/package.py\"], 0x7ffe040752c0 /* 120 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T05:41:44.892759"
+    },
+    {
+        "run_id": "1771998156",
+        "package": "packages/decoy/package_185.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.035,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_185.py\"], 0x7ffd81556fb0 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T05:42:36.209245"
+    },
+    {
+        "run_id": "187",
+        "package": "build/package.py",
+        "risk_probability": 0.9763720631599426,
+        "prediction": 1,
+        "file_entropy": 3.9679,
+        "execution_time": 0.179,
+        "exit_code": 0,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/opt/hostedtoolcache/Python/3.11.14/x64/bin/python\", [\"python\", \"build/package.py\"], 0x7ffc021fc0b0 /* 120 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T05:45:39.630827"
+    },
+    {
+        "run_id": "1771998391",
+        "package": "packages/decoy/package_187.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.041,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_187.py\"], 0x7ffd45304d10 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T05:46:31.582521"
+    },
+    {
+        "run_id": "188",
+        "package": "build/package.py",
+        "risk_probability": 0.9763720631599426,
+        "prediction": 1,
+        "file_entropy": 3.9679,
+        "execution_time": 0.27,
+        "exit_code": 0,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/opt/hostedtoolcache/Python/3.11.14/x64/bin/python\", [\"python\", \"build/package.py\"], 0x7ffc07a5a8a0 /* 120 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T05:59:34.639783"
+    },
+    {
+        "run_id": "1771999223",
+        "package": "packages/decoy/package_188.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.032,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_188.py\"], 0x7fff6dcf8b40 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T06:00:23.107579"
+    },
+    {
+        "run_id": "189",
+        "package": "build/package.py",
+        "risk_probability": 0.9763720631599426,
+        "prediction": 1,
+        "file_entropy": 3.9679,
+        "execution_time": 0.149,
+        "exit_code": 0,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/opt/hostedtoolcache/Python/3.11.14/x64/bin/python\", [\"python\", \"build/package.py\"], 0x7fff039d9000 /* 120 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T06:02:47.415417"
+    },
+    {
+        "run_id": "1771999412",
+        "package": "packages/decoy/package_189.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.032,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_189.py\"], 0x7ffd003d2890 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T06:03:32.413609"
+    },
+    {
+        "run_id": "190",
+        "package": "build/package.py",
+        "risk_probability": 0.9763720631599426,
+        "prediction": 1,
+        "file_entropy": 3.9679,
+        "execution_time": 0.132,
+        "exit_code": 0,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/opt/hostedtoolcache/Python/3.11.14/x64/bin/python\", [\"python\", \"build/package.py\"], 0x7ffcf2c36a80 /* 120 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T06:04:44.517988"
+    },
+    {
+        "run_id": "1771999532",
+        "package": "packages/decoy/package_190.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.037,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_190.py\"], 0x7ffec181e220 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-25T06:05:32.585254"
+    },
+    {
+        "run_id": "191",
+        "package": "build/package.py",
+        "risk_probability": 0.9763720631599426,
+        "prediction": 1,
+        "file_entropy": 4.627,
+        "execution_time": 0.408,
+        "exit_code": 1,
+        "suspicious_imports": [
+            "os",
+            "subprocess",
+            "socket",
+            "requests"
+        ],
+        "command_injection_calls": [
+            "system"
+        ],
+        "obfuscation_flags": [
+            "hex encoded string"
+        ],
+        "system_calls_detected": [
+            "execve(\"/opt/hostedtoolcache/Python/3.11.14/x64/bin/python\", [\"python\", \"build/package.py\"], 0x7ffd15c195d0 /* 120 vars */) = 0"
+        ],
+        "behavior_score": 9,
+        "mitre_techniques": [
+            {
+                "technique": "Command and Scripting Interpreter",
+                "id": "T1059",
+                "tactic": "Execution"
+            },
+            {
+                "technique": "Obfuscated Files or Information",
+                "id": "T1027",
+                "tactic": "Defense Evasion"
+            },
+            {
+                "technique": "User Execution",
+                "id": "T1204",
+                "tactic": "Execution"
+            }
+        ],
+        "timestamp": "2026-02-25T06:37:38.991223"
+    },
+    {
+        "run_id": "1772001511",
+        "package": "packages/decoy/package_191.py",
+        "file_entropy": 4.627,
+        "execution_time": 0.087,
+        "suspicious_imports": [
+            "os",
+            "subprocess",
+            "socket",
+            "requests"
+        ],
+        "command_injection_calls": [
+            "system"
+        ],
+        "obfuscation_flags": [
+            "hex encoded string"
+        ],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_191.py\"], 0x7ffd0eb29aa0 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 9,
+        "mitre_techniques": [
+            "T1059 - Command and Scripting Interpreter",
+            "T1027 - Obfuscated Files or Information",
+            "T1204 - User Execution"
+        ],
+        "timestamp": "2026-02-25T06:38:31.042848"
+    },
+    {
+        "run_id": "193",
+        "package": "build/package.py",
+        "risk_probability": 0.9763720631599426,
+        "prediction": 1,
+        "file_entropy": 4.6261,
+        "execution_time": 0.293,
+        "exit_code": 1,
+        "suspicious_imports": [
+            "os",
+            "subprocess",
+            "socket",
+            "requests"
+        ],
+        "command_injection_calls": [
+            "system"
+        ],
+        "obfuscation_flags": [
+            "hex encoded string"
+        ],
+        "system_calls_detected": [
+            "execve(\"/opt/hostedtoolcache/Python/3.11.14/x64/bin/python\", [\"python\", \"build/package.py\"], 0x7ffe35dacfb0 /* 120 vars */) = 0"
+        ],
+        "behavior_score": 9,
+        "mitre_techniques": [
+            {
+                "technique": "Command and Scripting Interpreter",
+                "id": "T1059",
+                "tactic": "Execution"
+            },
+            {
+                "technique": "Obfuscated Files or Information",
+                "id": "T1027",
+                "tactic": "Defense Evasion"
+            },
+            {
+                "technique": "User Execution",
+                "id": "T1204",
+                "tactic": "Execution"
+            }
+        ],
+        "timestamp": "2026-02-25T12:12:38.771771"
+    },
+    {
+        "run_id": "1772021606",
+        "package": "packages/decoy/package_193.py",
+        "file_entropy": 4.6261,
+        "execution_time": 0.076,
+        "suspicious_imports": [
+            "os",
+            "subprocess",
+            "socket",
+            "requests"
+        ],
+        "command_injection_calls": [
+            "system"
+        ],
+        "obfuscation_flags": [
+            "hex encoded string"
+        ],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_193.py\"], 0x7ffd3a446000 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 9,
+        "mitre_techniques": [
+            "T1059 - Command and Scripting Interpreter",
+            "T1027 - Obfuscated Files or Information",
+            "T1204 - User Execution"
+        ],
+        "timestamp": "2026-02-25T12:13:26.862832"
+    },
+    {
+        "run_id": "1",
+        "package": "build/package.py",
+        "risk_probability": 0.9763720631599426,
+        "prediction": 1,
+        "file_entropy": 3.9679,
+        "execution_time": 0.119,
+        "exit_code": 0,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/opt/hostedtoolcache/Python/3.11.14/x64/bin/python\", [\"python\", \"build/package.py\"], 0x7ffd26d3bd10 /* 120 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-27T16:17:16.680347"
+    },
+    {
+        "run_id": "1772209094",
+        "package": "packages/decoy/package_1.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.039,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_1.py\"], 0x7ffc424aff60 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-02-27T16:18:14.376484"
+    },
+    {
+        "run_id": "2",
+        "package": "build/package.py",
+        "risk_probability": 0.9763720631599426,
+        "prediction": 1,
+        "file_entropy": 3.9679,
+        "execution_time": 0.215,
+        "exit_code": 0,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/opt/hostedtoolcache/Python/3.11.14/x64/bin/python\", [\"python\", \"build/package.py\"], 0x7fffc59778e0 /* 120 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-03-03T04:31:39.624460"
+    },
+    {
+        "run_id": "1772512348",
+        "package": "packages/decoy/package_2.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.043,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_2.py\"], 0x7ffcf4d2a5a0 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-03-03T04:32:28.748262"
+    },
+    {
+        "run_id": "3",
+        "package": "build/package.py",
+        "risk_probability": 0.9763720631599426,
+        "prediction": 1,
+        "file_entropy": 3.9679,
+        "execution_time": 0.14,
+        "exit_code": 0,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/opt/hostedtoolcache/Python/3.11.14/x64/bin/python\", [\"python\", \"build/package.py\"], 0x7ffedf61a910 /* 120 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-03-03T04:35:39.592254"
+    },
+    {
+        "run_id": "1772512594",
+        "package": "packages/decoy/package_3.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.035,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_3.py\"], 0x7ffc4d1fc2b0 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-03-03T04:36:34.887949"
+    },
+    {
+        "run_id": "4",
+        "package": "build/package.py",
+        "risk_probability": 0.9763720631599426,
+        "prediction": 1,
+        "file_entropy": 3.9679,
+        "execution_time": 0.227,
+        "exit_code": 0,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/opt/hostedtoolcache/Python/3.11.14/x64/bin/python\", [\"python\", \"build/package.py\"], 0x7fff5d6b25c0 /* 120 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-03-03T04:46:19.855433"
+    },
+    {
+        "run_id": "1772513233",
+        "package": "packages/decoy/package_4.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.038,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_4.py\"], 0x7ffcfc5539c0 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-03-03T04:47:13.444011"
+    },
+    {
+        "run_id": "1772517077",
+        "package": "packages/decoy/package_5.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.039,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_5.py\"], 0x7ffc5d2ff000 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-03-03T05:51:17.602508"
+    },
+    {
+        "run_id": "1772667850",
+        "package": "packages/decoy/package_6.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.042,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_6.py\"], 0x7ffe75607ba0 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-03-04T23:44:10.213315"
+    },
+    {
+        "run_id": "1772669386",
+        "package": "packages/decoy/package_7.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.046,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_7.py\"], 0x7ffe2d604530 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-03-05T00:09:46.067997"
+    },
+    {
+        "run_id": "1772670666",
+        "package": "packages/decoy/package_8.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.036,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_8.py\"], 0x7ffd4d1a9310 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-03-05T00:31:06.647266"
+    },
+    {
+        "run_id": "1772671876",
+        "package": "packages/decoy/package_9.py",
+        "file_entropy": 3.9679,
+        "execution_time": 0.037,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_9.py\"], 0x7fff9609ee40 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-03-05T00:51:16.773049"
+    },
+    {
+        "run_id": "1772831137",
+        "package": "packages/decoy/package_10",
+        "file_entropy": 3.9679,
+        "execution_time": 0.036,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_10\"], 0x7ffdaad60670 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-03-06T21:05:37.927045"
+    },
+    {
+        "run_id": "1772833402",
+        "package": "packages/decoy/package_24",
+        "file_entropy": -0.0,
+        "execution_time": 0.035,
+        "suspicious_imports": [],
+        "command_injection_calls": [],
+        "obfuscation_flags": [],
+        "system_calls_detected": [
+            "execve(\"/usr/local/bin/python\", [\"python\", \"packages/decoy/package_24\"], 0x7fffa0aa61c0 /* 8 vars */) = 0"
+        ],
+        "behavior_score": 0,
+        "mitre_techniques": [],
+        "timestamp": "2026-03-06T21:43:22.146467"
+    }
+]
