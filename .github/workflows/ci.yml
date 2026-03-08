@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
     # ================= Checkout =================
     - name: Checkout Repository
       uses: actions/checkout@v4
@@ -43,23 +44,51 @@ jobs:
         nltk.download("stopwords")
         EOF
 
-    # ================= Detect Selected Package =================
-    - name: Detect Selected Package
+    # ================= Detect Package =================
+    - name: Detect Package
       id: detect_pkg
       run: |
-        FILE="${{ github.event.inputs.package_file }}"
 
-        if [ ! -f "$FILE" ]; then
-          echo "File not found: $FILE"
-          exit 1
+        PACKAGE=""
+
+        echo "Checking trigger type..."
+
+        # ---------- manual run ----------
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          PACKAGE="${{ github.event.inputs.package_file }}"
         fi
 
-        echo "Detected package: $FILE"
-        echo "package_path=$FILE" >> $GITHUB_OUTPUT
+        # ---------- push detection ----------
+        if [ -z "$PACKAGE" ]; then
+
+          echo "Checking changed files..."
+
+          FILES=$(git diff --name-only HEAD~1 HEAD)
+
+          for f in $FILES; do
+            if [[ "$f" == *.tgz ]] || [[ "$f" == *.tar.gz ]]; then
+              PACKAGE="$f"
+              break
+            fi
+          done
+
+        fi
+
+        if [ -z "$PACKAGE" ]; then
+          echo "No package detected"
+          echo "skip_pipeline=true" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        echo "Package detected: $PACKAGE"
+
+        echo "package_path=$PACKAGE" >> $GITHUB_OUTPUT
+        echo "skip_pipeline=false" >> $GITHUB_OUTPUT
 
     # ================= ML Security Gate =================
     - name: ML Security Gate
       id: ml_scan
+      if: steps.detect_pkg.outputs.skip_pipeline == 'false'
       continue-on-error: true
       run: |
         export PYTHONPATH=$PYTHONPATH:$(pwd)
@@ -67,7 +96,7 @@ jobs:
 
     # ================= Move to Decoy =================
     - name: Move to Decoy
-      if: steps.ml_scan.outcome == 'failure'
+      if: steps.detect_pkg.outputs.skip_pipeline == 'false' && steps.ml_scan.outcome == 'failure'
       run: |
         mkdir -p packages/decoy
         mv "${{ steps.detect_pkg.outputs.package_path }}" \
@@ -75,13 +104,13 @@ jobs:
 
     # ================= Build Sandbox =================
     - name: Build Sandbox Image
-      if: steps.ml_scan.outcome == 'failure'
+      if: steps.detect_pkg.outputs.skip_pipeline == 'false' && steps.ml_scan.outcome == 'failure'
       run: |
         docker build -t ssc-sandbox -f sandbox/Dockerfile .
 
     # ================= Dynamic Analysis =================
     - name: Run Dynamic Analysis
-      if: steps.ml_scan.outcome == 'failure'
+      if: steps.detect_pkg.outputs.skip_pipeline == 'false' && steps.ml_scan.outcome == 'failure'
       continue-on-error: true
       run: |
         docker run --rm \
@@ -92,7 +121,7 @@ jobs:
 
     # ================= Publish Benign =================
     - name: Publish Package
-      if: steps.ml_scan.outcome == 'success'
+      if: steps.detect_pkg.outputs.skip_pipeline == 'false' && steps.ml_scan.outcome == 'success'
       run: |
         mkdir -p packages/releases
         mv "${{ steps.detect_pkg.outputs.package_path }}" \
@@ -104,7 +133,7 @@ jobs:
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
 
-        git add packages/
+        git add packages/ || true
         git add decoy_logs/ || true
 
         git commit -m "SSC pipeline result (run ${{ github.run_number }})" || echo "Nothing to commit"
