@@ -8,7 +8,8 @@ import hashlib
 import tarfile
 import urllib.request
 from datetime import datetime
-from collections import defaultdict 
+from collections import defaultdict
+
 
 # ==========================================
 # INPUT VALIDATION
@@ -24,45 +25,49 @@ if not os.path.exists(target_file):
     print("File not found:", target_file)
     sys.exit(1)
 
+
 # ==========================================
 # FILE HASH
 # ==========================================
 
 def file_hash(path):
     h = hashlib.sha256()
-    with open(path,"rb") as f:
+    with open(path, "rb") as f:
         h.update(f.read())
     return h.hexdigest()
 
+
 package_hash = file_hash(target_file)
+
 
 # ==========================================
 # RUNTIME DATA STRUCTURES
 # ==========================================
 
-spawned_processes=set()
-network_connections=[]
-file_created=set()
-file_written=set()
-file_deleted=set()
-sensitive_access=set()
-commands_detected=set()
-syscall_counter=defaultdict(int)
-timeline=[]
+spawned_processes = set()
+network_connections = []
+file_created = set()
+file_written = set()
+file_deleted = set()
+sensitive_access = set()
+commands_detected = set()
+syscall_counter = defaultdict(int)
+timeline = []
 
-sensitive_paths=[
-"/etc/passwd",
-"/etc/shadow",
-"/root",
-".ssh",
-"/home",
-"/tmp"
+sensitive_paths = [
+    "/etc/passwd",
+    "/etc/shadow",
+    "/root",
+    ".ssh",
+    "/home",
+    "/tmp"
 ]
 
-suspicious_commands=[
-"curl","wget","bash","sh","nc","netcat",
-"chmod","chown","python","node"
+suspicious_commands = [
+    "curl", "wget", "bash", "sh", "nc", "netcat",
+    "chmod", "chown", "python", "node"
 ]
+
 
 # ==========================================
 # THREAT INTELLIGENCE LOOKUP
@@ -71,20 +76,21 @@ suspicious_commands=[
 def enrich_ip(ip):
 
     try:
-        url=f"http://ip-api.com/json/{ip}"
-        response=urllib.request.urlopen(url,timeout=3)
-        data=json.loads(response.read().decode())
+        url = f"http://ip-api.com/json/{ip}"
+        response = urllib.request.urlopen(url, timeout=3)
+        data = json.loads(response.read().decode())
 
         return {
-            "ip":ip,
-            "country":data.get("country"),
-            "asn":data.get("as"),
-            "org":data.get("org"),
-            "isp":data.get("isp")
+            "ip": ip,
+            "country": data.get("country"),
+            "asn": data.get("as"),
+            "org": data.get("org"),
+            "isp": data.get("isp")
         }
 
     except:
-        return {"ip":ip}
+        return {"ip": ip}
+
 
 # ==========================================
 # EXTRACT PACKAGE
@@ -92,63 +98,77 @@ def enrich_ip(ip):
 
 print("Extracting package...")
 
-sandbox_dir="sandbox_env"
-os.makedirs(sandbox_dir,exist_ok=True)
+sandbox_dir = "sandbox_env"
+os.makedirs(sandbox_dir, exist_ok=True)
 
-extract_dir=os.path.join(sandbox_dir,"package")
+extract_dir = os.path.join(sandbox_dir, "package")
 
 if os.path.exists(extract_dir):
-    subprocess.run(["rm","-rf",extract_dir])
+    subprocess.run(["rm", "-rf", extract_dir])
 
 os.makedirs(extract_dir)
 
 try:
-    with tarfile.open(target_file,"r:*") as tar:
+    with tarfile.open(target_file, "r:*") as tar:
         tar.extractall(extract_dir)
 except:
     print("Extraction failed")
+
 
 # ==========================================
 # DETECT PACKAGE TYPE
 # ==========================================
 
-is_npm=False
-is_python=False
+is_npm = False
+is_python = False
 
-for root,dirs,files in os.walk(extract_dir):
+for root, dirs, files in os.walk(extract_dir):
 
     if "package.json" in files:
-        is_npm=True
+        is_npm = True
 
     if "setup.py" in files or "pyproject.toml" in files:
-        is_python=True
+        is_python = True
+
 
 # ==========================================
 # COMMAND TO EXECUTE
 # ==========================================
 
-cmd=None
+cmd = None
 
 if is_npm:
 
     print("Detected NPM package")
 
-    cmd=["npm","install","--ignore-scripts=false"]
+    # try to find JS entry file
+    main_js = None
+
+    for root, dirs, files in os.walk(extract_dir):
+        for f in files:
+            if f.endswith(".js"):
+                main_js = os.path.join(root, f)
+                break
+        if main_js:
+            break
+
+    if main_js:
+        cmd = ["node", main_js]
+    else:
+        cmd = ["npm", "install", "--ignore-scripts=false"]
 
 elif is_python:
 
     print("Detected Python package")
 
-cmd=["pip","install","--ignore-scripts=false"]
+    cmd = ["pip", "install", "."]
 
 else:
 
     print("Unknown package type")
 
-    cmd=[
-    "python",
-    target_file
-    ]
+    cmd = ["python", target_file]
+
 
 # ==========================================
 # eBPF MONITORING (TRACEe)
@@ -156,18 +176,18 @@ else:
 
 print("Starting eBPF monitoring...")
 
-tracee_process=None
-tracee_log="tracee_output.json"
+tracee_process = None
+tracee_log = "tracee_output.json"
 
 try:
 
-    tracee_process=subprocess.Popen(
+    tracee_process = subprocess.Popen(
         [
-        "tracee",
-        "-o",
-        "json"
+            "tracee",
+            "-o",
+            "json"
         ],
-        stdout=open(tracee_log,"w"),
+        stdout=open(tracee_log, "w"),
         stderr=subprocess.DEVNULL
     )
 
@@ -176,40 +196,40 @@ try:
 except:
     print("Tracee not available, fallback to strace")
 
+
 # ==========================================
-# STRACE FALLBACK
+# STRACE EXECUTION
 # ==========================================
 
-start_time=time.time()
+start_time = time.time()
 
-process=subprocess.Popen(
+process = subprocess.Popen(
 
-[
-"strace",
-"-ff",
-"-tt",
-"-e",
-"trace=execve,clone,fork,vfork,open,openat,write,connect,sendto,recvfrom,unlink,rename"
-]+cmd,
+    [
+        "strace",
+        "-ff",
+        "-tt",
+        "-e",
+        "trace=execve,clone,fork,vfork,open,openat,write,connect,sendto,recvfrom,unlink,rename"
+    ] + cmd,
 
-cwd=extract_dir,
-
-stdout=subprocess.PIPE,
-stderr=subprocess.PIPE,
-text=True
-
+    cwd=extract_dir,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True
 )
 
 try:
-    stdout,stderr=process.communicate(timeout=30)
+    stdout, stderr = process.communicate(timeout=30)
 except subprocess.TimeoutExpired:
     process.kill()
-    stdout,stderr=process.communicate()
+    stdout, stderr = process.communicate()
 
-runtime=round(time.time()-start_time,3)
+runtime = round(time.time() - start_time, 3)
 
 if tracee_process:
     tracee_process.kill()
+
 
 # ==========================================
 # PARSE STRACE
@@ -220,23 +240,23 @@ for line in stderr.split("\n"):
     if not line.strip():
         continue
 
-    syscall=line.split("(")[0].split()[-1]
-    syscall_counter[syscall]+=1
+    syscall = line.split("(")[0].split()[-1]
+    syscall_counter[syscall] += 1
 
     timeline.append({
-    "timestamp":datetime.utcnow().isoformat(),
-    "event":syscall,
-    "detail":line.strip()
+        "timestamp": datetime.utcnow().isoformat(),
+        "event": syscall,
+        "detail": line.strip()
     })
 
     # PROCESS DETECTION
     if "execve(" in line:
 
-        match=re.search(r'execve\("([^"]+)"',line)
+        match = re.search(r'execve\("([^"]+)"', line)
 
         if match:
 
-            proc=os.path.basename(match.group(1))
+            proc = os.path.basename(match.group(1))
             spawned_processes.add(proc)
 
             if proc in suspicious_commands:
@@ -245,27 +265,27 @@ for line in stderr.split("\n"):
     # NETWORK DETECTION
     if "connect(" in line:
 
-        ip_match=re.search(r'inet_addr\("([^"]+)"\)',line)
-        port_match=re.search(r'htons\((\d+)\)',line)
+        ip_match = re.search(r'inet_addr\("([^"]+)"\)', line)
+        port_match = re.search(r'htons\((\d+)\)', line)
 
         if ip_match:
 
-            ip=ip_match.group(1)
-            port=port_match.group(1) if port_match else "unknown"
+            ip = ip_match.group(1)
+            port = port_match.group(1) if port_match else "unknown"
 
             network_connections.append({
-            "ip":ip,
-            "port":port
+                "ip": ip,
+                "port": port
             })
 
     # FILE SYSTEM
     if "open(" in line or "openat(" in line:
 
-        file_match=re.search(r'"([^"]+)"',line)
+        file_match = re.search(r'"([^"]+)"', line)
 
         if file_match:
 
-            f=file_match.group(1)
+            f = file_match.group(1)
 
             if "O_CREAT" in line:
                 file_created.add(f)
@@ -274,57 +294,59 @@ for line in stderr.split("\n"):
                 file_written.add(f)
 
             for s in sensitive_paths:
-
                 if s in f:
                     sensitive_access.add(f)
 
     # FILE DELETE
     if "unlink(" in line:
 
-        match=re.search(r'"([^"]+)"',line)
+        match = re.search(r'"([^"]+)"', line)
 
         if match:
             file_deleted.add(match.group(1))
+
 
 # ==========================================
 # THREAT INTELLIGENCE ENRICHMENT
 # ==========================================
 
-ti_connections=[]
+ti_connections = []
 
 for n in network_connections:
 
-    enriched=enrich_ip(n["ip"])
+    enriched = enrich_ip(n["ip"])
 
     ti_connections.append({
-        "ip":n["ip"],
-        "port":n["port"],
-        "country":enriched.get("country"),
-        "asn":enriched.get("asn"),
-        "org":enriched.get("org")
+        "ip": n["ip"],
+        "port": n["port"],
+        "country": enriched.get("country"),
+        "asn": enriched.get("asn"),
+        "org": enriched.get("org")
     })
+
 
 # ==========================================
 # BEHAVIOR SCORING
 # ==========================================
 
-score=0
+score = 0
 
-score+=min(len(network_connections),5)
-score+=min(len(spawned_processes),3)
-score+=min(len(file_written),3)
+score += min(len(network_connections), 5)
+score += min(len(spawned_processes), 3)
+score += min(len(file_written), 3)
 
 if sensitive_access:
-    score+=3
+    score += 3
 
 if commands_detected:
-    score+=2
+    score += 2
+
 
 # ==========================================
 # MITRE ATTACK
 # ==========================================
 
-mitre=[]
+mitre = []
 
 if commands_detected:
     mitre.append("T1059 Command Interpreter")
@@ -338,60 +360,61 @@ if sensitive_access:
 if file_written:
     mitre.append("T1105 Ingress Tool Transfer")
 
+
 # ==========================================
 # SAVE LOG
 # ==========================================
 
-os.makedirs("decoy_logs",exist_ok=True)
+os.makedirs("decoy_logs", exist_ok=True)
 
-run_id=os.getenv("GITHUB_RUN_NUMBER",str(int(time.time())))
+run_id = os.getenv("GITHUB_RUN_NUMBER", str(int(time.time())))
 
-log={
+log = {
 
-"run_id":run_id,
+    "run_id": run_id,
 
-"package":{
-"name":os.path.basename(target_file),
-"path":target_file,
-"hash":package_hash
-},
+    "package": {
+        "name": os.path.basename(target_file),
+        "path": target_file,
+        "hash": package_hash
+    },
 
-"runtime_seconds":runtime,
+    "runtime_seconds": runtime,
 
-"process_activity":list(spawned_processes),
+    "process_activity": list(spawned_processes),
 
-"network_activity":{
-"connections":len(network_connections),
-"details":ti_connections
-},
+    "network_activity": {
+        "connections": len(network_connections),
+        "details": ti_connections
+    },
 
-"filesystem_activity":{
-"files_created":list(file_created),
-"files_written":list(file_written),
-"files_deleted":list(file_deleted)
-},
+    "filesystem_activity": {
+        "files_created": list(file_created),
+        "files_written": list(file_written),
+        "files_deleted": list(file_deleted)
+    },
 
-"sensitive_access":list(sensitive_access),
+    "sensitive_access": list(sensitive_access),
 
-"commands_detected":list(commands_detected),
+    "commands_detected": list(commands_detected),
 
-"syscall_stats":dict(syscall_counter),
+    "syscall_stats": dict(syscall_counter),
 
-"behavior_score":score,
+    "behavior_score": score,
 
-"mitre_techniques":mitre,
+    "mitre_techniques": mitre,
 
-"timeline":timeline[:50],
+    "timeline": timeline[:50],
 
-"timestamp":datetime.utcnow().isoformat()
+    "timestamp": datetime.utcnow().isoformat()
 
 }
 
-with open(f"decoy_logs/log_{run_id}.json","w") as f:
-    json.dump(log,f,indent=4)
+with open(f"decoy_logs/log_{run_id}.json", "w") as f:
+    json.dump(log, f, indent=4)
 
-with open("decoy_logs/latest.json","w") as f:
-    json.dump(log,f,indent=4)
+with open("decoy_logs/latest.json", "w") as f:
+    json.dump(log, f, indent=4)
 
 print("Analysis finished")
-print("Behavior score:",score)
+print("Behavior score:", score)
