@@ -297,7 +297,7 @@ ioc = {
 os.makedirs("decoy_logs", exist_ok=True)
 
 run_id = str(int(time.time()))
-
+mitre = list(set(mitre))
 log = {
 
     "run_id": run_id,
