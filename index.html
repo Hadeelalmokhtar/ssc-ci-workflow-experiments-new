@@ -90,13 +90,31 @@ font-size:22px;
 <h1>🛡 SSC Threat Intelligence Dashboard</h1>
 
 <div class="card">
+
 <h2>Analysis Information</h2>
 
 <div class="list">
-<div class="item"><strong>Package:</strong> <span id="pkgName">-</span></div>
-<div class="item"><strong>Run ID:</strong> <span id="runID">-</span></div>
-<div class="item"><strong>Execution Time:</strong> <span id="runTime">-</span> sec</div>
-<div class="item"><strong>Behavior Score:</strong> <span id="behaviorScore">-</span></div>
+
+<div class="item">
+<strong>Package:</strong>
+<span id="pkgName">-</span>
+</div>
+
+<div class="item">
+<strong>Run ID:</strong>
+<span id="runID">-</span>
+</div>
+
+<div class="item">
+<strong>Execution Time:</strong>
+<span id="runTime">-</span> sec
+</div>
+
+<div class="item">
+<strong>Behavior Score:</strong>
+<span id="behaviorScore">-</span>
+</div>
+
 </div>
 
 <h3>Threat Verdict</h3>
@@ -104,37 +122,17 @@ font-size:22px;
 
 </div>
 
+
 <div class="grid">
 
 <div class="card">
-<h2>Threat Score</h2>
-<canvas id="gauge"></canvas>
-</div>
-
-<div class="card">
-<h2>Risk Trend</h2>
-<canvas id="trend"></canvas>
-</div>
-
-<div class="card">
 <h2>Network Activity</h2>
-<canvas id="networkChart"></canvas>
 <div id="networkList" class="list"></div>
-</div>
-
-<div class="card">
-<h2>Network Graph</h2>
-<div id="networkGraph" style="height:350px;"></div>
 </div>
 
 <div class="card">
 <h2>Process Activity</h2>
 <div id="processList" class="list"></div>
-</div>
-
-<div class="card">
-<h2>Process Tree</h2>
-<div id="processTree" style="height:350px;"></div>
 </div>
 
 <div class="card">
@@ -153,28 +151,8 @@ font-size:22px;
 </div>
 
 <div class="card">
-<h2>Syscall Heatmap</h2>
-<canvas id="syscallChart"></canvas>
-</div>
-
-<div class="card">
-<h2>MITRE ATT&CK Matrix</h2>
+<h2>MITRE ATT&CK</h2>
 <div id="mitrePanel"></div>
-</div>
-
-<div class="card">
-<h2>IOC Indicators</h2>
-<div id="iocPanel" class="list"></div>
-</div>
-
-<div class="card">
-<h2>Attack Path</h2>
-<div id="attackGraph" style="height:350px;"></div>
-</div>
-
-<div class="card">
-<h2>Behavior Comparison</h2>
-<canvas id="comparisonChart"></canvas>
 </div>
 
 <div class="card">
@@ -184,81 +162,217 @@ font-size:22px;
 
 </div>
 
+
 <script>
 
 const BASE_PATH = window.location.pathname.split("/")[1]
 
-let gaugeChart,trendChart,networkChart,syscallChart,comparisonChart;
-
 async function safeFetch(url){
+
 try{
-const r=await fetch(url+"?t="+Date.now());
-if(!r.ok) return null;
-return await r.json();
+
+const r=await fetch(url+"?t="+Date.now())
+
+if(!r.ok) return null
+
+return await r.json()
+
 }catch{
-return null;
+
+return null
+
 }
+
 }
 
 async function loadData(){
 
-const latest=await safeFetch(`/${BASE_PATH}/decoy_logs/latest.json`);
-const history=await safeFetch(`/${BASE_PATH}/decoy_logs/history.json`);
+const latest=await safeFetch(`/${BASE_PATH}/decoy_logs/latest.json`)
+const history=await safeFetch(`/${BASE_PATH}/decoy_logs/history.json`)
 
-if(!latest) return;
+if(!latest) return
 
-renderRunInfo(latest);
+renderRunInfo(latest)
 
-renderGauge(latest.behavior_score||0);
-renderTrend(history||[]);
-renderNetwork(latest.network_activity||{});
-renderNetworkGraph(latest.network_activity||{});
-renderProcesses(latest.process_activity||[]);
-renderProcessTree(latest.process_activity||[]);
-renderFilesystem(latest.filesystem_activity||{});
-renderSensitive(latest.sensitive_access||[]);
-renderCommands(latest.commands_detected||[]);
-renderSyscalls(latest.syscall_stats||{});
-renderMitre(latest.mitre_techniques||[]);
-renderTimeline(latest.timeline||[]);
-renderComparison(history||[]);
-renderIOC(latest);
-renderAttackPath(latest);
+renderNetwork(latest.network_activity||{})
+renderProcesses(latest.process_activity||[])
+renderFilesystem(latest.filesystem_activity||{})
+renderSensitive(latest.sensitive_access||[])
+renderCommands(latest.commands_detected||[])
+renderMitre(latest.mitre_techniques||[])
+renderTimeline(latest.timeline||[])
 
 }
 
 function renderRunInfo(data){
 
-document.getElementById("pkgName").textContent=data.package?.name || "-";
-document.getElementById("runID").textContent=data.run_id || "-";
-document.getElementById("runTime").textContent=data.runtime_seconds || "-";
+document.getElementById("pkgName").textContent=data.package?.name || "-"
+document.getElementById("runID").textContent=data.run_id || "-"
+document.getElementById("runTime").textContent=data.runtime_seconds || "-"
 
-const score=data.behavior_score || 0;
-document.getElementById("behaviorScore").textContent=score;
+const score=data.behavior_score || 0
 
-let verdict="";
-let css="";
+document.getElementById("behaviorScore").textContent=score
+
+let verdict=""
+let css=""
 
 if(score<=3){
-verdict="CLEAN";
-css="verdict-clean";
+
+verdict="CLEAN"
+css="verdict-clean"
+
 }
+
 else if(score<=7){
-verdict="SUSPICIOUS";
-css="verdict-suspicious";
+
+verdict="SUSPICIOUS"
+css="verdict-suspicious"
+
 }
+
 else{
-verdict="MALICIOUS";
-css="verdict-malicious";
+
+verdict="MALICIOUS"
+css="verdict-malicious"
+
 }
 
 document.getElementById("verdictPanel").innerHTML=
-`<span class="${css}">${verdict}</span>`;
+`<span class="${css}">${verdict}</span>`
 
 }
 
-loadData();
-setInterval(loadData,8000);
+function renderNetwork(net){
+
+const list=document.getElementById("networkList")
+
+list.innerHTML=""
+
+(net.details||[]).forEach(n=>{
+
+list.innerHTML+=`
+<div class="item">
+
+<strong>${n.ip}:${n.port}</strong><br>
+
+Country: ${n.country || "unknown"}<br>
+ASN: ${n.asn || "-"}<br>
+Org: ${n.org || "-"}
+
+</div>
+`
+
+})
+
+}
+
+function renderProcesses(p){
+
+const list=document.getElementById("processList")
+
+list.innerHTML=""
+
+p.forEach(proc=>{
+
+list.innerHTML+=`<div class="item">${proc}</div>`
+
+})
+
+}
+
+function renderFilesystem(fs){
+
+const list=document.getElementById("fsList")
+
+list.innerHTML=""
+
+(fs.files_created||[]).forEach(f=>{
+
+list.innerHTML+=`<div class="item">Created: ${f}</div>`
+
+})
+
+(fs.files_written||[]).forEach(f=>{
+
+list.innerHTML+=`<div class="item">Written: ${f}</div>`
+
+})
+
+(fs.files_deleted||[]).forEach(f=>{
+
+list.innerHTML+=`<div class="item">Deleted: ${f}</div>`
+
+})
+
+}
+
+function renderSensitive(list){
+
+const panel=document.getElementById("sensitiveList")
+
+panel.innerHTML=""
+
+list.forEach(p=>{
+
+panel.innerHTML+=`<div class="item high">${p}</div>`
+
+})
+
+}
+
+function renderCommands(list){
+
+const panel=document.getElementById("commandList")
+
+panel.innerHTML=""
+
+list.forEach(c=>{
+
+panel.innerHTML+=`<div class="item medium">${c}</div>`
+
+})
+
+}
+
+function renderMitre(list){
+
+const panel=document.getElementById("mitrePanel")
+
+panel.innerHTML=""
+
+list.forEach(m=>{
+
+panel.innerHTML+=`<div class="mitre">${m}</div>`
+
+})
+
+}
+
+function renderTimeline(events){
+
+const container=document.getElementById("timeline")
+
+container.innerHTML=""
+
+events.slice(0,30).forEach(e=>{
+
+container.innerHTML+=`
+<div class="timeline">
+
+<strong>${e.event}</strong><br>
+${e.detail}
+
+</div>
+`
+
+})
+
+}
+
+loadData()
+
+setInterval(loadData,8000)
 
 </script>
 
