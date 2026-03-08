@@ -111,8 +111,8 @@ os.makedirs(extract_dir)
 try:
     with tarfile.open(target_file, "r:*") as tar:
         tar.extractall(extract_dir)
-except:
-    print("Extraction failed")
+except Exception as e:
+    print("Extraction failed:", e)
 
 
 # ==========================================
@@ -141,21 +141,8 @@ if is_npm:
 
     print("Detected NPM package")
 
-    # try to find JS entry file
-    main_js = None
-
-    for root, dirs, files in os.walk(extract_dir):
-        for f in files:
-            if f.endswith(".js"):
-                main_js = os.path.join(root, f)
-                break
-        if main_js:
-            break
-
-    if main_js:
-        cmd = ["node", main_js]
-    else:
-        cmd = ["npm", "install", "--ignore-scripts=false"]
+    # run npm install to trigger postinstall malware
+    cmd = ["npm", "install", "--ignore-scripts=false"]
 
 elif is_python:
 
@@ -182,11 +169,7 @@ tracee_log = "tracee_output.json"
 try:
 
     tracee_process = subprocess.Popen(
-        [
-            "tracee",
-            "-o",
-            "json"
-        ],
+        ["tracee", "-o", "json"],
         stdout=open(tracee_log, "w"),
         stderr=subprocess.DEVNULL
     )
@@ -220,7 +203,7 @@ process = subprocess.Popen(
 )
 
 try:
-    stdout, stderr = process.communicate(timeout=30)
+    stdout, stderr = process.communicate(timeout=40)
 except subprocess.TimeoutExpired:
     process.kill()
     stdout, stderr = process.communicate()
@@ -237,32 +220,55 @@ if tracee_process:
 
 for line in stderr.split("\n"):
 
-    if not line.strip():
+    line = line.strip()
+
+    if not line:
         continue
 
-    syscall = line.split("(")[0].split()[-1]
-    syscall_counter[syscall] += 1
+    # extract syscall safely
+    match = re.match(r".*? ([a-zA-Z_]+)\(", line)
+
+    if match:
+        syscall = match.group(1)
+        syscall_counter[syscall] += 1
+    else:
+        continue
 
     timeline.append({
         "timestamp": datetime.utcnow().isoformat(),
         "event": syscall,
-        "detail": line.strip()
+        "detail": line
     })
 
+    # ======================================
     # PROCESS DETECTION
+    # ======================================
+
     if "execve(" in line:
 
-        match = re.search(r'execve\("([^"]+)"', line)
+        proc_match = re.search(r'execve\("([^"]+)"', line)
 
-        if match:
+        if proc_match:
 
-            proc = os.path.basename(match.group(1))
+            proc = os.path.basename(proc_match.group(1))
             spawned_processes.add(proc)
 
             if proc in suspicious_commands:
                 commands_detected.add(proc)
 
+    # ======================================
+    # COMMAND DETECTION
+    # ======================================
+
+    for cmd_name in suspicious_commands:
+
+        if cmd_name in line:
+            commands_detected.add(cmd_name)
+
+    # ======================================
     # NETWORK DETECTION
+    # ======================================
+
     if "connect(" in line:
 
         ip_match = re.search(r'inet_addr\("([^"]+)"\)', line)
@@ -278,7 +284,10 @@ for line in stderr.split("\n"):
                 "port": port
             })
 
-    # FILE SYSTEM
+    # ======================================
+    # FILESYSTEM DETECTION
+    # ======================================
+
     if "open(" in line or "openat(" in line:
 
         file_match = re.search(r'"([^"]+)"', line)
@@ -297,7 +306,6 @@ for line in stderr.split("\n"):
                 if s in f:
                     sensitive_access.add(f)
 
-    # FILE DELETE
     if "unlink(" in line:
 
         match = re.search(r'"([^"]+)"', line)
@@ -331,15 +339,15 @@ for n in network_connections:
 
 score = 0
 
-score += min(len(network_connections), 5)
-score += min(len(spawned_processes), 3)
-score += min(len(file_written), 3)
+score += min(len(network_connections) * 2, 10)
+score += min(len(spawned_processes), 4)
+score += min(len(file_written), 4)
 
 if sensitive_access:
-    score += 3
+    score += 4
 
 if commands_detected:
-    score += 2
+    score += 3
 
 
 # ==========================================
