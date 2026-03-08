@@ -133,20 +133,13 @@ if is_npm:
 
     print("Detected NPM package")
 
-    cmd=[
-    "npm",
-    "install"
-    ]
+    cmd=["npm","install","--ignore-scripts=false"]
 
 elif is_python:
 
     print("Detected Python package")
 
-    cmd=[
-    "pip",
-    "install",
-    "."
-    ]
+cmd=["pip","install","--ignore-scripts=false"]
 
 else:
 
