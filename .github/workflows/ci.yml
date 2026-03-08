@@ -23,6 +23,8 @@ jobs:
     # ================= Checkout =================
     - name: Checkout Repository
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     # ================= Setup Python =================
     - name: Setup Python
@@ -51,19 +53,22 @@ jobs:
 
         PACKAGE=""
 
-        echo "Checking trigger type..."
+        echo "Trigger type: ${{ github.event_name }}"
 
-        # ---------- manual run ----------
+        # ===== Manual run =====
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           PACKAGE="${{ github.event.inputs.package_file }}"
         fi
 
-        # ---------- push detection ----------
+        # ===== Push detection =====
         if [ -z "$PACKAGE" ]; then
 
           echo "Checking changed files..."
 
-          FILES=$(git diff --name-only HEAD~1 HEAD)
+          FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
+
+          echo "Changed files:"
+          echo "$FILES"
 
           for f in $FILES; do
             if [[ "$f" == *.tgz ]] || [[ "$f" == *.tar.gz ]]; then
@@ -74,8 +79,9 @@ jobs:
 
         fi
 
+        # ===== No package =====
         if [ -z "$PACKAGE" ]; then
-          echo "No package detected"
+          echo "No package detected → skipping pipeline"
           echo "skip_pipeline=true" >> $GITHUB_OUTPUT
           exit 0
         fi
@@ -84,6 +90,7 @@ jobs:
 
         echo "package_path=$PACKAGE" >> $GITHUB_OUTPUT
         echo "skip_pipeline=false" >> $GITHUB_OUTPUT
+
 
     # ================= ML Security Gate =================
     - name: ML Security Gate
@@ -94,6 +101,7 @@ jobs:
         export PYTHONPATH=$PYTHONPATH:$(pwd)
         python -m scripts.run_analysis "${{ steps.detect_pkg.outputs.package_path }}"
 
+
     # ================= Move to Decoy =================
     - name: Move to Decoy
       if: steps.detect_pkg.outputs.skip_pipeline == 'false' && steps.ml_scan.outcome == 'failure'
@@ -102,11 +110,13 @@ jobs:
         mv "${{ steps.detect_pkg.outputs.package_path }}" \
            packages/decoy/package_${{ github.run_number }}.tgz
 
+
     # ================= Build Sandbox =================
     - name: Build Sandbox Image
       if: steps.detect_pkg.outputs.skip_pipeline == 'false' && steps.ml_scan.outcome == 'failure'
       run: |
         docker build -t ssc-sandbox -f sandbox/Dockerfile .
+
 
     # ================= Dynamic Analysis =================
     - name: Run Dynamic Analysis
@@ -119,6 +129,7 @@ jobs:
           python sandbox/runner.py \
           packages/decoy/package_${{ github.run_number }}.tgz
 
+
     # ================= Publish Benign =================
     - name: Publish Package
       if: steps.detect_pkg.outputs.skip_pipeline == 'false' && steps.ml_scan.outcome == 'success'
@@ -126,6 +137,7 @@ jobs:
         mkdir -p packages/releases
         mv "${{ steps.detect_pkg.outputs.package_path }}" \
            packages/releases/package_${{ github.run_number }}.tgz
+
 
     # ================= Commit Results =================
     - name: Commit Results
