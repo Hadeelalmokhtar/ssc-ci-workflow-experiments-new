@@ -4,365 +4,311 @@ import json
 import subprocess
 import time
 import re
-import hashlib
 import tarfile
+import tempfile
 import urllib.request
 from datetime import datetime
 from collections import defaultdict
 
-# ==============================
-# INPUT VALIDATION
-# ==============================
+# ============================
+# INPUT
+# ============================
 
 if len(sys.argv) < 2:
-    print("Usage: python runner.py <package>")
+    print("Usage: python run_analysis.py <file>")
     sys.exit(1)
 
-target_file = sys.argv[1]
+original_input = sys.argv[1]
 
-if not os.path.exists(target_file):
-    print("File not found:", target_file)
-    sys.exit(1)
+# ============================
+# EXTRACT PACKAGE
+# ============================
 
-# ==============================
-# HASH
-# ==============================
+def extract_package_if_needed(path):
 
-def file_hash(path):
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        h.update(f.read())
-    return h.hexdigest()
+    if path.endswith(".tgz") or path.endswith(".tar.gz"):
 
-package_hash = file_hash(target_file)
+        temp_dir = tempfile.mkdtemp()
 
-# ==============================
-# DATA STRUCTURES
-# ==============================
+        with tarfile.open(path,"r:gz") as tar:
+            tar.extractall(temp_dir)
 
-spawned_processes = set()
-network_connections = []
-dns_queries = []
-file_created = set()
-file_written = set()
-file_deleted = set()
-sensitive_access = set()
-commands_detected = set()
-ioc_domains = set()
-ioc_ips = set()
+        return temp_dir
 
-syscall_counter = defaultdict(int)
-timeline = []
+    return path
 
-# ==============================
-# HEURISTIC MALWARE FAMILIES
-# ==============================
 
-family_signatures = {
-    "cryptominer": ["xmrig","miner","stratum"],
-    "data_exfiltration": ["curl","wget","ftp","upload"],
-    "reverse_shell": ["nc","netcat","bash -i","sh -i"],
-    "credential_stealer": ["/etc/passwd","/etc/shadow",".ssh"],
-}
+file_path = extract_package_if_needed(original_input)
 
-# ==============================
-# THREAT INTEL
-# ==============================
+# ============================
+# FIND EXECUTABLE
+# ============================
+
+analysis_target = None
+
+for root,dirs,files in os.walk(file_path):
+
+    for f in files:
+
+        if f.endswith(".js") or f.endswith(".py"):
+
+            analysis_target = os.path.join(root,f)
+
+            break
+
+    if analysis_target:
+        break
+
+if analysis_target is None:
+
+    print("No executable file found")
+    sys.exit(0)
+
+# ============================
+# THREAT INTEL LOOKUP
+# ============================
 
 def enrich_ip(ip):
 
     try:
-        url = f"http://ip-api.com/json/{ip}"
-        r = urllib.request.urlopen(url, timeout=3)
-        data = json.loads(r.read().decode())
+
+        url=f"http://ip-api.com/json/{ip}"
+
+        response=urllib.request.urlopen(url,timeout=3)
+
+        data=json.loads(response.read().decode())
 
         return {
-            "ip": ip,
-            "country": data.get("country"),
-            "asn": data.get("as"),
-            "org": data.get("org")
+
+        "ip":ip,
+        "country":data.get("country"),
+        "asn":data.get("as"),
+        "org":data.get("org"),
+        "isp":data.get("isp")
+
         }
 
     except:
-        return {"ip": ip}
 
-# ==============================
-# EXTRACT PACKAGE
-# ==============================
+        return {"ip":ip}
 
-sandbox_dir = "sandbox_env"
-os.makedirs(sandbox_dir, exist_ok=True)
+# ============================
+# STRACE SANDBOX
+# ============================
 
-extract_dir = os.path.join(sandbox_dir,"package")
-
-if os.path.exists(extract_dir):
-    subprocess.run(["rm","-rf",extract_dir])
-
-os.makedirs(extract_dir)
-
-with tarfile.open(target_file,"r:*") as tar:
-    tar.extractall(extract_dir)
-
-# ==============================
-# DETECT PACKAGE TYPE
-# ==============================
-
-is_npm=False
-is_python=False
-
-for root,dirs,files in os.walk(extract_dir):
-
-    if "package.json" in files:
-        is_npm=True
-
-    if "setup.py" in files or "pyproject.toml" in files:
-        is_python=True
-
-# ==============================
-# COMMAND
-# ==============================
-
-if is_npm:
-    cmd=["npm","install","--ignore-scripts=false"]
-
-elif is_python:
-    cmd=["pip","install","."]
-
-else:
-    cmd=["python",target_file]
-
-# ==============================
-# STRACE
-# ==============================
+print("Starting dynamic analysis")
 
 start=time.time()
 
 process=subprocess.Popen(
 
-[
-"strace",
-"-ff",
-"-tt",
-"-e",
-"trace=execve,clone,fork,vfork,open,openat,write,connect,sendto,recvfrom,unlink"
-]+cmd,
+["strace","-f","-e","trace=execve,open,connect,write,sendto"],
 
-cwd=extract_dir,
 stdout=subprocess.PIPE,
 stderr=subprocess.PIPE,
 text=True
+
 )
 
 try:
-    stdout,stderr=process.communicate(timeout=40)
-except:
+
+    stdout,stderr=process.communicate(timeout=20)
+
+except subprocess.TimeoutExpired:
+
     process.kill()
+
     stdout,stderr=process.communicate()
 
 runtime=round(time.time()-start,3)
 
-# ==============================
-# PARSE STRACE
-# ==============================
+# ============================
+# PARSE EVENTS
+# ============================
+
+commands=set()
+ips=set()
+dns_activity=[]
+processes=[]
+files=[]
+timeline=[]
+syscalls=defaultdict(int)
+sensitive=[]
+
+sensitive_paths=["/etc/passwd","/etc/shadow",".ssh","/root"]
 
 for line in stderr.split("\n"):
 
-    line=line.strip()
     if not line:
         continue
 
-    match=re.match(r".*? ([a-zA-Z_]+)\(",line)
+    timeline.append(line)
 
-    if not match:
-        continue
+    syscall=line.split("(")[0].split()[-1]
 
-    syscall=match.group(1)
-    syscall_counter[syscall]+=1
+    syscalls[syscall]+=1
 
-    timeline.append({
-        "timestamp":datetime.utcnow().isoformat(),
-        "event":syscall,
-        "detail":line
-    })
-
-    # ==========================
     # PROCESS
-    # ==========================
 
     if "execve(" in line:
 
-        p=re.search(r'execve\("([^"]+)"',line)
+        m=re.search(r'execve\("([^"]+)"',line)
 
-        if p:
+        if m:
 
-            proc=os.path.basename(p.group(1))
-            spawned_processes.add(proc)
-            commands_detected.add(proc)
+            proc=os.path.basename(m.group(1))
 
-    # ==========================
-    # CONNECT
-    # ==========================
+            processes.append(proc)
+
+            commands.add(proc)
+
+    # NETWORK
 
     if "connect(" in line:
 
         ip_match=re.search(r'inet_addr\("([^"]+)"\)',line)
-        port_match=re.search(r'htons\((\d+)\)',line)
 
         if ip_match:
 
             ip=ip_match.group(1)
-            port=port_match.group(1) if port_match else "unknown"
 
-            network_connections.append({
-                "ip":ip,
-                "port":port
-            })
+            ips.add(ip)
 
-            ioc_ips.add(ip)
-
-    # ==========================
-    # DNS via sendto
-    # ==========================
+    # DNS
 
     if "sendto(" in line:
 
-        network_connections.append({
-            "ip":"unknown",
-            "port":"dns"
-        })
+        dns_activity.append("DNS query detected")
 
-        dns_queries.append("dns_request")
-
-    # ==========================
     # FILE
-    # ==========================
 
-    if "open(" in line or "openat(" in line:
+    if "open(" in line:
 
-        m=re.search(r'"([^"]+)"',line)
+        f=re.search(r'"([^"]+)"',line)
 
-        if m:
+        if f:
 
-            f=m.group(1)
+            path=f.group(1)
 
-            if "O_CREAT" in line:
-                file_created.add(f)
+            files.append(path)
 
-            if "O_WRONLY" in line or "O_RDWR" in line:
-                file_written.add(f)
+            for s in sensitive_paths:
 
-            if "/etc/passwd" in f or ".ssh" in f:
-                sensitive_access.add(f)
+                if s in path:
+                    sensitive.append(path)
 
-# ==============================
-# MALWARE FAMILY DETECTION
-# ==============================
+# ============================
+# ENRICH IPS
+# ============================
 
-detected_family="unknown"
+network_details=[]
 
-all_text=" ".join(commands_detected)+" ".join(sensitive_access)
+for ip in ips:
 
-for fam,patterns in family_signatures.items():
+    network_details.append(enrich_ip(ip))
 
-    for p in patterns:
+# ============================
+# MITRE
+# ============================
 
-        if p in all_text:
-            detected_family=fam
+mitre=[]
 
-# ==============================
+if ips:
+    mitre.append("T1071 Application Layer Protocol")
+
+if commands:
+    mitre.append("T1059 Command Interpreter")
+
+if sensitive:
+    mitre.append("T1005 Data from Local System")
+
+# ============================
 # BEHAVIOR SCORE
-# ==============================
+# ============================
 
-score=0
+score=len(ips)*2+len(commands)
 
-score+=len(network_connections)*2
-score+=len(commands_detected)
-score+=len(sensitive_access)*2
+verdict="CLEAN"
 
-# ==============================
+if score>5:
+    verdict="MALICIOUS"
+
+# ============================
 # ATTACK GRAPH
-# ==============================
+# ============================
 
-attack_graph={
+nodes=[{"id":1,"label":"Package"}]
 
-"nodes":[
-{"id":"package","label":"Package"},
-{"id":"process","label":"Process"},
-{"id":"network","label":"Network"},
-{"id":"filesystem","label":"Filesystem"}
-],
+edges=[]
 
-"edges":[
-{"from":"package","to":"process"},
-{"from":"process","to":"filesystem"},
-{"from":"process","to":"network"}
-]
+i=2
 
-}
+for p in processes:
 
-# ==============================
+    nodes.append({"id":i,"label":p})
+
+    edges.append({"from":1,"to":i})
+
+    i+=1
+
+attack_graph={"nodes":nodes,"edges":edges}
+
+# ============================
+# IOC
+# ============================
+
+ioc={"ips":list(ips)}
+
+# ============================
 # SAVE LOG
-# ==============================
+# ============================
 
 os.makedirs("decoy_logs",exist_ok=True)
 
-run_id=os.getenv("GITHUB_RUN_NUMBER",str(int(time.time())))
+run_id=str(int(time.time()))
 
 log={
 
 "run_id":run_id,
 
-"package":{
-"name":os.path.basename(target_file),
-"path":target_file,
-"hash":package_hash
-},
+"package":{"name":os.path.basename(original_input)},
 
-"runtime_seconds":runtime,
-
-"process_activity":list(spawned_processes),
-
-"network_activity":{
-"connections":len(network_connections),
-"details":network_connections
-},
-
-"dns_activity":dns_queries,
-
-"filesystem_activity":{
-"files_created":list(file_created),
-"files_written":list(file_written),
-"files_deleted":list(file_deleted)
-},
-
-"sensitive_access":list(sensitive_access),
-
-"commands_detected":list(commands_detected),
-
-"ioc":{
-"ips":list(ioc_ips),
-"domains":list(ioc_domains)
-},
-
-"malware_family":detected_family,
-
-"syscall_stats":dict(syscall_counter),
+"runtime":runtime,
 
 "behavior_score":score,
 
+"threat_verdict":verdict,
+
+"ioc":ioc,
+
+"commands_detected":list(commands),
+
+"network_activity":{"details":network_details},
+
+"dns_activity":dns_activity,
+
+"process_activity":processes,
+
+"filesystem":files,
+
+"sensitive_access":sensitive,
+
+"mitre":mitre,
+
 "attack_graph":attack_graph,
 
-"timeline":timeline[:50],
+"timeline":timeline[:40],
 
 "timestamp":datetime.utcnow().isoformat()
 
 }
 
 with open(f"decoy_logs/log_{run_id}.json","w") as f:
+
     json.dump(log,f,indent=4)
 
 with open("decoy_logs/latest.json","w") as f:
+
     json.dump(log,f,indent=4)
 
 print("Analysis finished")
-print("Behavior score:",score)
