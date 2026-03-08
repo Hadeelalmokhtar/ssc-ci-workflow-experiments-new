@@ -1,178 +1,251 @@
 import sys
 import os
 import json
-import joblib
 import subprocess
 import time
-import ast
-import math
 import re
-import tarfile
-import tempfile
 from datetime import datetime
+from collections import defaultdict
 
-# ======================================
-# IMPORT SAP EXTRACTORS
-# ======================================
-from scripts.sap_feature_engine.pypi_feature_extractor import PyPI_Feature_Extractor
-from scripts.sap_feature_engine.npm_feature_extractor import NPM_Feature_Extractor
-from scripts.package_adapter import PackageAdapter
-
-# ======================================
-# PATHS
-# ======================================
-model_path = "ml/malicious_model.pkl"
-preprocess_path = "ml/preprocess.pkl"
-
-# ======================================
-# INPUT
-# ======================================
+# ==========================================
+# INPUT VALIDATION
+# ==========================================
 if len(sys.argv) < 2:
-    print("Usage: python -m scripts.run_analysis <file_or_folder>")
+    print("Usage: python runner.py <file>")
     sys.exit(1)
 
-original_input = sys.argv[1]
+target_file = sys.argv[1]
 
-# ======================================
-# HANDLE COMPRESSED PACKAGES
-# ======================================
-def extract_package_if_needed(path):
-    if path.endswith(".tgz") or path.endswith(".tar.gz"):
-        temp_dir = tempfile.mkdtemp()
-        with tarfile.open(path, "r:gz") as tar:
-            tar.extractall(temp_dir)
-        return temp_dir
-    return path
+if not os.path.exists(target_file):
+    print("File not found:", target_file)
+    sys.exit(1)
 
-file_path = extract_package_if_needed(original_input)
+# ==========================================
+# RUNTIME CONTAINERS
+# ==========================================
+spawned_processes = set()
+network_connections = []
+file_created = set()
+file_written = set()
+file_deleted = set()
+sensitive_access = set()
+commands_detected = set()
+domains_contacted = set()
+syscall_counter = defaultdict(int)
+timeline = []
 
-# ======================================
-# BUILD PACKAGE STRUCTURE
-# ======================================
-adapter = PackageAdapter()
+sensitive_paths = [
+    "/etc/passwd",
+    "/etc/shadow",
+    "/root",
+    ".ssh",
+    "/home",
+    "/tmp"
+]
 
-if os.path.isfile(file_path):
-    package_root = adapter.build_from_single_file(file_path)
-else:
-    package_root = file_path
+suspicious_commands = [
+    "curl","wget","bash","sh","nc","netcat",
+    "chmod","chown","python","node"
+]
 
-# ======================================
-# SELECT CORRECT EXTRACTOR (STABLE FIX)
-# ======================================
-
-def contains_package_json(path):
-    for root, _, files in os.walk(path):
-        if "package.json" in files:
-            return True
-    return False
-
-if contains_package_json(file_path):
-    extractor = NPM_Feature_Extractor()
-    repo_name = "NPM"
-else:
-    extractor = PyPI_Feature_Extractor()
-    repo_name = "PyPI"
-
-# IMPORTANT: ALWAYS DEFINE FEATURES
-features = extractor.extract_features(package_root)
-features["Package Repository"] = repo_name
-
-# ======================================
-# LOAD MODEL
-# ======================================
-preprocess = joblib.load(preprocess_path)
-model = joblib.load(model_path)
-
-X = preprocess.transform(features)
-
-pred = int(model.predict(X)[0])
-proba = float(model.predict_proba(X)[0][1]) if hasattr(model, "predict_proba") else 0.0
-
-print("Prediction:", pred)
-print("Malicious Probability:", proba)
-
-# ======================================
-# FIND EXECUTABLE FILE FOR DYNAMIC
-# ======================================
-analysis_target = None
-
-if os.path.isdir(file_path):
-    for root, dirs, files in os.walk(file_path):
-        for fname in files:
-            if original_input.endswith(".tgz") and fname.endswith(".js"):
-                analysis_target = os.path.join(root, fname)
-                break
-            elif fname.endswith(".py"):
-                analysis_target = os.path.join(root, fname)
-                break
-        if analysis_target:
-            break
-
-if analysis_target is None:
-    print("No executable file found for dynamic analysis.")
-    sys.exit(0)
-
-# ======================================
-# ENTROPY
-# ======================================
-def calculate_entropy(data):
-    if not data:
-        return 0
-    prob = [float(data.count(c)) / len(data) for c in set(data)]
-    return -sum(p * math.log2(p) for p in prob)
-
-with open(analysis_target, "r", errors="ignore") as f:
-    content = f.read()
-
-file_entropy = round(calculate_entropy(content), 4)
-
-# ======================================
-# STRACE SANDBOX
-# ======================================
-print("Starting sandbox execution with strace...")
+# ==========================================
+# STRACE EXECUTION
+# ==========================================
+print("Starting decoy sandbox execution...")
 
 start_time = time.time()
 
 process = subprocess.Popen(
-    ["strace", "-f", "-e", "trace=execve,open,connect,write,fork",
-     "node" if repo_name == "NPM" else "python",
-     analysis_target],
+    [
+        "strace",
+        "-ff",
+        "-tt",
+        "-e",
+        "trace=execve,clone,fork,vfork,open,openat,write,connect,sendto,recvfrom,unlink,rename",
+        "python",
+        target_file
+    ],
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
     text=True
 )
 
 try:
-    stdout, stderr = process.communicate(timeout=15)
+    stdout, stderr = process.communicate(timeout=20)
 except subprocess.TimeoutExpired:
     process.kill()
     stdout, stderr = process.communicate()
 
-execution_time = round(time.time() - start_time, 3)
+runtime = round(time.time() - start_time, 3)
 
-# ======================================
-# SAVE LOG
-# ======================================
+# ==========================================
+# STRACE PARSER
+# ==========================================
+for line in stderr.split("\n"):
+
+    if not line.strip():
+        continue
+
+    # count syscalls
+    syscall = line.split("(")[0].split()[-1]
+    syscall_counter[syscall] += 1
+
+    # timeline
+    timeline.append({
+        "timestamp": datetime.utcnow().isoformat(),
+        "event": syscall,
+        "detail": line.strip()
+    })
+
+    # --------------------------------------
+    # PROCESS DETECTION
+    # --------------------------------------
+    if "execve(" in line:
+        match = re.search(r'execve\("([^"]+)"', line)
+        if match:
+            proc = os.path.basename(match.group(1))
+            spawned_processes.add(proc)
+
+            if proc in suspicious_commands:
+                commands_detected.add(proc)
+
+    # --------------------------------------
+    # NETWORK DETECTION
+    # --------------------------------------
+    if "connect(" in line:
+        ip_match = re.search(r'inet_addr\("([^"]+)"\)', line)
+        port_match = re.search(r'htons\((\d+)\)', line)
+
+        if ip_match:
+            ip = ip_match.group(1)
+            port = port_match.group(1) if port_match else "unknown"
+
+            network_connections.append({
+                "ip": ip,
+                "port": port
+            })
+
+    # --------------------------------------
+    # FILE SYSTEM ACTIVITY
+    # --------------------------------------
+    if "open(" in line or "openat(" in line:
+        file_match = re.search(r'"([^"]+)"', line)
+        if file_match:
+            f = file_match.group(1)
+
+            if "O_CREAT" in line:
+                file_created.add(f)
+
+            if "O_WRONLY" in line or "O_RDWR" in line:
+                file_written.add(f)
+
+            for s in sensitive_paths:
+                if s in f:
+                    sensitive_access.add(f)
+
+    # --------------------------------------
+    # FILE DELETION
+    # --------------------------------------
+    if "unlink(" in line:
+        match = re.search(r'"([^"]+)"', line)
+        if match:
+            file_deleted.add(match.group(1))
+
+# ==========================================
+# BEHAVIOR SCORING
+# ==========================================
+score = 0
+
+score += min(len(network_connections),5)
+score += min(len(spawned_processes),3)
+score += min(len(file_written),3)
+
+if sensitive_access:
+    score += 3
+
+if commands_detected:
+    score += 2
+
+# ==========================================
+# MITRE ATT&CK MAPPING
+# ==========================================
+mitre = []
+
+if commands_detected:
+    mitre.append("T1059 Command and Scripting Interpreter")
+
+if network_connections:
+    mitre.append("T1071 Application Layer Protocol")
+
+if sensitive_access:
+    mitre.append("T1005 Data from Local System")
+
+if file_written:
+    mitre.append("T1105 Ingress Tool Transfer")
+
+# ==========================================
+# LOG STRUCTURE
+# ==========================================
 os.makedirs("decoy_logs", exist_ok=True)
 
-run_id = str(int(time.time()))
+run_id = os.getenv("GITHUB_RUN_NUMBER", str(int(time.time())))
 
-dynamic_log = {
+log = {
     "run_id": run_id,
-    "package": original_input,
-    "risk_probability": proba,
-    "prediction": pred,
-    "file_entropy": file_entropy,
-    "execution_time": execution_time,
+    "package": target_file,
+    "runtime_seconds": runtime,
+
+    "process_activity": list(spawned_processes),
+
+    "network_activity": {
+        "connections": len(network_connections),
+        "details": network_connections
+    },
+
+    "filesystem_activity": {
+        "files_created": list(file_created),
+        "files_written": list(file_written),
+        "files_deleted": list(file_deleted)
+    },
+
+    "sensitive_access": list(sensitive_access),
+
+    "commands_detected": list(commands_detected),
+
+    "syscall_stats": dict(syscall_counter),
+
+    "behavior_score": score,
+
+    "mitre_techniques": mitre,
+
+    "timeline": timeline[:50],
+
     "timestamp": datetime.utcnow().isoformat()
 }
 
-with open(f"decoy_logs/log_{run_id}.json", "w") as f:
-    json.dump(dynamic_log, f, indent=4)
+# ==========================================
+# SAVE LOGS
+# ==========================================
+with open(f"decoy_logs/log_{run_id}.json","w") as f:
+    json.dump(log,f,indent=4)
 
-with open("decoy_logs/latest.json", "w") as f:
-    json.dump(dynamic_log, f, indent=4)
+with open("decoy_logs/latest.json","w") as f:
+    json.dump(log,f,indent=4)
 
-print("Logs saved.")
+history_path="decoy_logs/history.json"
 
-sys.exit(1 if pred == 1 else 0)
+if os.path.exists(history_path):
+    with open(history_path,"r") as f:
+        history=json.load(f)
+else:
+    history=[]
+
+history.append(log)
+
+with open(history_path,"w") as f:
+    json.dump(history[-50:],f,indent=4)
+
+print("Decoy analysis complete.")
+print("Behavior score:",score)
+
+sys.exit(0)
