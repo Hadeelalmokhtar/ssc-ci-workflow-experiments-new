@@ -5,7 +5,6 @@
 <title>SSC Threat Intelligence Dashboard</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/dist/vis-network.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/vis-network/styles/vis-network.min.css" rel="stylesheet">
 
@@ -65,12 +64,45 @@ margin-bottom:8px;
 .medium{color:#ffcc00}
 .low{color:#4dff88}
 
+.verdict-clean{
+color:#4dff88;
+font-weight:bold;
+font-size:22px;
+}
+
+.verdict-suspicious{
+color:#ffcc00;
+font-weight:bold;
+font-size:22px;
+}
+
+.verdict-malicious{
+color:#ff4d4d;
+font-weight:bold;
+font-size:22px;
+}
+
 </style>
 </head>
 
 <body>
 
 <h1>🛡 SSC Threat Intelligence Dashboard</h1>
+
+<div class="card">
+<h2>Analysis Information</h2>
+
+<div class="list">
+<div class="item"><strong>Package:</strong> <span id="pkgName">-</span></div>
+<div class="item"><strong>Run ID:</strong> <span id="runID">-</span></div>
+<div class="item"><strong>Execution Time:</strong> <span id="runTime">-</span> sec</div>
+<div class="item"><strong>Behavior Score:</strong> <span id="behaviorScore">-</span></div>
+</div>
+
+<h3>Threat Verdict</h3>
+<div id="verdictPanel">-</div>
+
+</div>
 
 <div class="grid">
 
@@ -173,6 +205,8 @@ const history=await safeFetch("decoy_logs/history.json");
 
 if(!latest) return;
 
+renderRunInfo(latest);
+
 renderGauge(latest.behavior_score||0);
 renderTrend(history||[]);
 renderNetwork(latest.network_activity||{});
@@ -186,10 +220,38 @@ renderSyscalls(latest.syscall_stats||{});
 renderMitre(latest.mitre_techniques||[]);
 renderTimeline(latest.timeline||[]);
 renderComparison(history||[]);
-
-/* NEW FEATURES */
 renderIOC(latest);
 renderAttackPath(latest);
+
+}
+
+function renderRunInfo(data){
+
+document.getElementById("pkgName").textContent=data.package || "-";
+document.getElementById("runID").textContent=data.run_id || "-";
+document.getElementById("runTime").textContent=data.runtime_seconds || "-";
+
+const score=data.behavior_score || 0;
+document.getElementById("behaviorScore").textContent=score;
+
+let verdict="";
+let css="";
+
+if(score<=3){
+verdict="CLEAN";
+css="verdict-clean";
+}
+else if(score<=7){
+verdict="SUSPICIOUS";
+css="verdict-suspicious";
+}
+else{
+verdict="MALICIOUS";
+css="verdict-malicious";
+}
+
+document.getElementById("verdictPanel").innerHTML=
+`<span class="${css}">${verdict}</span>`;
 
 }
 
@@ -467,19 +529,15 @@ const processNode=id;
 id++;
 
 (data.network_activity?.details||[]).forEach(net=>{
-
 nodes.push({id:id,label:net.ip,color:"#ef4444"});
 edges.push({from:processNode,to:id});
 id++;
-
 });
 
 (data.filesystem_activity?.files_created||[]).forEach(f=>{
-
 nodes.push({id:id,label:f,color:"#f59e0b"});
 edges.push({from:processNode,to:id});
 id++;
-
 });
 
 });
