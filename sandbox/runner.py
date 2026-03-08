@@ -169,14 +169,16 @@ ip_regex = r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b'
 domain_regex = r'[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
 
 for line in stderr.split("\n"):
-
     if not line:
         continue
 
     timeline.append(line)
 
-    syscall = line.split("(")[0].split()[-1]
-    syscalls[syscall] += 1
+    parts = line.split("(")[0].split()
+
+    if parts:
+        syscall = parts[-1]
+        syscalls[syscall] += 1
 
     # PROCESS
     if "execve(" in line:
