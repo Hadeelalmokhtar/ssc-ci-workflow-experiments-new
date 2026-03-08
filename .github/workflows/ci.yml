@@ -164,6 +164,4 @@ jobs:
           git add decoy_logs/ || true
 
           git commit -m "SSC pipeline result (run ${{ github.run_number }})" || echo "Nothing to commit"
-
-          git pull --rebase origin main || true
           git push origin main
