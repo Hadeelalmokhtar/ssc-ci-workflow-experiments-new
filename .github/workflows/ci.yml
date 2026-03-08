@@ -20,155 +20,150 @@ jobs:
 
     steps:
 
-    # ================= Checkout =================
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    # ================= Setup Python =================
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
 
-    # ================= Install Dependencies =================
-    - name: Install Dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    # ================= Download NLTK =================
-    - name: Download NLTK Data
-      run: |
-        python - <<EOF
-        import nltk
-        nltk.download("stopwords")
-        EOF
 
-    # ================= Detect Package =================
-    - name: Detect Package
-      id: detect_pkg
-      run: |
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-        PACKAGE=""
 
-        echo "Trigger type: ${{ github.event_name }}"
+      - name: Download NLTK Data
+        run: |
+          python -c "import nltk; nltk.download('stopwords')"
 
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          PACKAGE="${{ github.event.inputs.package_file }}"
-        fi
 
-        if [ -z "$PACKAGE" ]; then
+      - name: Detect Package
+        id: detect_pkg
+        run: |
 
-          FILES=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" 2>/dev/null || true)
+          PACKAGE=""
 
-          for f in $FILES; do
-            if [[ "$f" == *.tgz ]] || [[ "$f" == *.tar.gz ]]; then
-              PACKAGE="$f"
-              break
-            fi
-          done
-        fi
+          echo "Trigger type: ${{ github.event_name }}"
 
-        if [ -z "$PACKAGE" ]; then
-          PACKAGE=$(ls *.tgz *.tar.gz 2>/dev/null | head -n 1 || true)
-        fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            PACKAGE="${{ github.event.inputs.package_file }}"
+          fi
 
-        if [ -z "$PACKAGE" ]; then
-          echo "No package detected → skipping pipeline"
-          echo "skip_pipeline=true" >> $GITHUB_OUTPUT
-          echo "package_path=" >> $GITHUB_OUTPUT
-          exit 0
-        fi
+          if [ -z "$PACKAGE" ]; then
+            FILES=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" 2>/dev/null || true)
 
-        echo "Package detected: $PACKAGE"
+            for f in $FILES; do
+              if [[ "$f" == *.tgz ]] || [[ "$f" == *.tar.gz ]]; then
+                PACKAGE="$f"
+                break
+              fi
+            done
+          fi
 
-        echo "skip_pipeline=false" >> $GITHUB_OUTPUT
-        echo "package_path=$PACKAGE" >> $GITHUB_OUTPUT
+          if [ -z "$PACKAGE" ]; then
+            PACKAGE=$(ls *.tgz *.tar.gz 2>/dev/null | head -n 1 || true)
+          fi
 
-    # ================= ML Scan =================
-    - name: ML Security Gate
-      id: ml_scan
-      if: steps.detect_pkg.outputs.skip_pipeline == 'false'
-      continue-on-error: true
-      run: |
-        export PYTHONPATH=$PYTHONPATH:$(pwd)
-        python -m scripts.run_analysis "${{ steps.detect_pkg.outputs.package_path }}"
+          if [ -z "$PACKAGE" ]; then
+            echo "No package detected → skipping pipeline"
+            echo "skip_pipeline=true" >> $GITHUB_OUTPUT
+            echo "package_path=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
 
-    # ================= Move Package to Decoy =================
-    - name: Move Package to Decoy
-      if: steps.detect_pkg.outputs.skip_pipeline == 'false'
-      run: |
-        mkdir -p packages/decoy
+          echo "Package detected: $PACKAGE"
 
-        mv "${{ steps.detect_pkg.outputs.package_path }}" \
-           packages/decoy/package_${{ github.run_number }}.tgz
+          echo "skip_pipeline=false" >> $GITHUB_OUTPUT
+          echo "package_path=$PACKAGE" >> $GITHUB_OUTPUT
 
-    # ================= Build Sandbox =================
-    - name: Build Sandbox Image
-      if: steps.detect_pkg.outputs.skip_pipeline == 'false'
-      run: |
-        docker build -t ssc-sandbox -f sandbox/Dockerfile .
 
-    # ================= Dynamic Analysis =================
-    - name: Run Dynamic Analysis
-      if: steps.detect_pkg.outputs.skip_pipeline == 'false'
-      continue-on-error: true
-      run: |
-        docker run --rm \
+
+      - name: ML Security Gate
+        id: ml_scan
+        if: steps.detect_pkg.outputs.skip_pipeline == 'false'
+        continue-on-error: true
+        run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
+          python -m scripts.run_analysis "${{ steps.detect_pkg.outputs.package_path }}"
+
+
+
+      - name: Move Package to Decoy
+        if: steps.detect_pkg.outputs.skip_pipeline == 'false'
+        run: |
+          mkdir -p packages/decoy
+
+          mv -f "${{ steps.detect_pkg.outputs.package_path }}" \
+          packages/decoy/package_${{ github.run_number }}.tgz
+
+
+
+      - name: Build Sandbox Image
+        if: steps.detect_pkg.outputs.skip_pipeline == 'false'
+        run: |
+          docker build -t ssc-sandbox -f sandbox/Dockerfile .
+
+
+
+      - name: Run Dynamic Analysis
+        if: steps.detect_pkg.outputs.skip_pipeline == 'false'
+        continue-on-error: true
+        run: |
+          docker run --rm \
           -v ${{ github.workspace }}:/app \
           ssc-sandbox \
           python sandbox/runner.py \
           packages/decoy/package_${{ github.run_number }}.tgz
 
-    # ================= Decision Engine =================
-    - name: Release Package if Clean
-      if: steps.detect_pkg.outputs.skip_pipeline == 'false'
-      run: |
 
-        LOG_FILE="decoy_logs/latest.json"
 
-        if [ ! -f "$LOG_FILE" ]; then
-          echo "No sandbox log found"
-          exit 0
-        fi
+      - name: Release Package if Clean
+        if: steps.detect_pkg.outputs.skip_pipeline == 'false'
+        run: |
 
-        VERDICT=$(python - <<EOF
-import json
-with open("decoy_logs/latest.json") as f:
-    print(json.load(f).get("threat_verdict","UNKNOWN"))
-EOF
-)
+          LOG_FILE="decoy_logs/latest.json"
 
-        echo "Sandbox verdict: $VERDICT"
+          if [ ! -f "$LOG_FILE" ]; then
+            echo "No sandbox log found"
+            exit 0
+          fi
 
-        if [ "$VERDICT" = "CLEAN" ]; then
+          VERDICT=$(python -c "import json;print(json.load(open('decoy_logs/latest.json')).get('threat_verdict','UNKNOWN'))")
 
-          echo "Package confirmed safe → releasing"
+          echo "Sandbox verdict: $VERDICT"
 
-          mkdir -p packages/releases
+          if [ "$VERDICT" = "CLEAN" ]; then
 
-          mv packages/decoy/package_${{ github.run_number }}.tgz \
-             packages/releases/package_${{ github.run_number }}.tgz
+            echo "Package confirmed safe → releasing"
 
-        else
+            mkdir -p packages/releases
 
-          echo "Package not safe → staying in decoy"
+            mv packages/decoy/package_${{ github.run_number }}.tgz \
+            packages/releases/package_${{ github.run_number }}.tgz
 
-        fi
+          else
 
-    # ================= Commit Results =================
-    - name: Commit Results
-      run: |
+            echo "Package not safe → staying in decoy"
 
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
+          fi
 
-        git add packages/ || true
-        git add decoy_logs/ || true
 
-        git commit -m "SSC pipeline result (run ${{ github.run_number }})" || echo "Nothing to commit"
 
-        git pull --rebase origin main || true
-        git push origin main
+      - name: Commit Results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add packages/ || true
+          git add decoy_logs/ || true
+
+          git commit -m "SSC pipeline result (run ${{ github.run_number }})" || echo "Nothing to commit"
+
+          git pull --rebase origin main || true
+          git push origin main
