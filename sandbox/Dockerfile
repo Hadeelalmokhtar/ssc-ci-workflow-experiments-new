@@ -1,11 +1,21 @@
-FROM python:3.10
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install strace (for dynamic syscall tracing)
-RUN apt-get update && apt-get install -y strace && rm -rf /var/lib/apt/lists/*
+# Install system tools
+RUN apt-get update && apt-get install -y \
+    strace \
+    curl \
+    wget \
+    git \
+    nodejs \
+    npm \
+    procps \
+    iproute2 \
+    net-tools \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy everything
+# Copy project
 COPY . .
 
 # Install Python dependencies
@@ -14,4 +24,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Ensure scripts module works
 ENV PYTHONPATH=/app
 
-CMD ["python", "scripts/run_analysis.py", "packages/clean_test.py"]
+# Default command
+CMD ["python", "sandbox/runner.py"]
