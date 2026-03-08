@@ -93,16 +93,52 @@ def enrich_ip(ip):
         return {"ip":ip}
 
 # ============================
-# STRACE SANDBOX
+# MALWARE FAMILY HINT
+# ============================
+
+def detect_family(commands):
+
+    for c in commands:
+
+        if "curl" in c or "wget" in c:
+            return "Downloader"
+
+        if "xmrig" in c:
+            return "Crypto Miner"
+
+        if "nc" in c or "netcat" in c:
+            return "Backdoor"
+
+    return "Unknown"
+
+# ============================
+# SANDBOX EXECUTION
 # ============================
 
 print("Starting dynamic analysis")
 
 start=time.time()
 
+# tcpdump capture
+pcap_file="network_capture.pcap"
+
+tcpdump = subprocess.Popen(
+["tcpdump","-i","any","-w",pcap_file],
+stdout=subprocess.DEVNULL,
+stderr=subprocess.DEVNULL
+)
+
+# choose runtime
+
+if analysis_target.endswith(".js"):
+    run_cmd=["node",analysis_target]
+
+else:
+    run_cmd=["python3",analysis_target]
+
 process=subprocess.Popen(
 
-["strace","-f","-e","trace=execve,open,connect,write,sendto"],
+["strace","-f","-e","trace=execve,open,connect,write,sendto"] + run_cmd,
 
 stdout=subprocess.PIPE,
 stderr=subprocess.PIPE,
@@ -120,6 +156,8 @@ except subprocess.TimeoutExpired:
 
     stdout,stderr=process.communicate()
 
+tcpdump.kill()
+
 runtime=round(time.time()-start,3)
 
 # ============================
@@ -135,7 +173,7 @@ timeline=[]
 syscalls=defaultdict(int)
 sensitive=[]
 
-sensitive_paths=["/etc/passwd","/etc/shadow",".ssh","/root"]
+sensitive_paths=["/etc/passwd","/etc/shadow",".ssh","/root",".env","id_rsa"]
 
 for line in stderr.split("\n"):
 
@@ -222,16 +260,24 @@ if commands:
 if sensitive:
     mitre.append("T1005 Data from Local System")
 
+if dns_activity:
+    mitre.append("T1046 Network Discovery")
+
 # ============================
 # BEHAVIOR SCORE
 # ============================
 
-score=len(ips)*2+len(commands)
+score=len(ips)*3 + len(commands)*2 + len(sensitive)*4
 
 verdict="CLEAN"
 
 if score>5:
+    verdict="SUSPICIOUS"
+
+if score>10:
     verdict="MALICIOUS"
+
+family=detect_family(commands)
 
 # ============================
 # ATTACK GRAPH
@@ -276,6 +322,8 @@ log={
 "runtime":runtime,
 
 "behavior_score":score,
+
+"malware_family_hint":family,
 
 "threat_verdict":verdict,
 
