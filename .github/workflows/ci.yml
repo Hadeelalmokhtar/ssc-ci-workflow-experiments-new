@@ -50,6 +50,7 @@ jobs:
     - name: Detect Package
       id: detect_pkg
       run: |
+        set +e
 
         PACKAGE=""
 
@@ -62,10 +63,9 @@ jobs:
 
         # ===== Push detection =====
         if [ -z "$PACKAGE" ]; then
-
           echo "Checking changed files..."
 
-          FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} 2>/dev/null || true)
+          FILES=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" 2>/dev/null || true)
 
           echo "Changed files:"
           echo "$FILES"
@@ -78,23 +78,26 @@ jobs:
           done
         fi
 
-        # ===== fallback search =====
+        # ===== Fallback search =====
         if [ -z "$PACKAGE" ]; then
           echo "Searching repository for package..."
           PACKAGE=$(ls *.tgz *.tar.gz 2>/dev/null | head -n 1 || true)
         fi
 
-        # ===== No package =====
+        # ===== No package found =====
         if [ -z "$PACKAGE" ]; then
           echo "No package detected → skipping pipeline"
           echo "skip_pipeline=true" >> $GITHUB_OUTPUT
+          echo "package_path=" >> $GITHUB_OUTPUT
           exit 0
         fi
 
         echo "Package detected: $PACKAGE"
 
-        echo "package_path=$PACKAGE" >> $GITHUB_OUTPUT
         echo "skip_pipeline=false" >> $GITHUB_OUTPUT
+        echo "package_path=$PACKAGE" >> $GITHUB_OUTPUT
+
+        exit 0
 
     # ================= ML Security Gate =================
     - name: ML Security Gate
