@@ -65,7 +65,7 @@ jobs:
 
           echo "Checking changed files..."
 
-          FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
+          FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} 2>/dev/null || true)
 
           echo "Changed files:"
           echo "$FILES"
@@ -76,7 +76,12 @@ jobs:
               break
             fi
           done
+        fi
 
+        # ===== fallback search =====
+        if [ -z "$PACKAGE" ]; then
+          echo "Searching repository for package..."
+          PACKAGE=$(ls *.tgz *.tar.gz 2>/dev/null | head -n 1 || true)
         fi
 
         # ===== No package =====
@@ -91,7 +96,6 @@ jobs:
         echo "package_path=$PACKAGE" >> $GITHUB_OUTPUT
         echo "skip_pipeline=false" >> $GITHUB_OUTPUT
 
-
     # ================= ML Security Gate =================
     - name: ML Security Gate
       id: ml_scan
@@ -101,7 +105,6 @@ jobs:
         export PYTHONPATH=$PYTHONPATH:$(pwd)
         python -m scripts.run_analysis "${{ steps.detect_pkg.outputs.package_path }}"
 
-
     # ================= Move to Decoy =================
     - name: Move to Decoy
       if: steps.detect_pkg.outputs.skip_pipeline == 'false' && steps.ml_scan.outcome == 'failure'
@@ -110,13 +113,11 @@ jobs:
         mv "${{ steps.detect_pkg.outputs.package_path }}" \
            packages/decoy/package_${{ github.run_number }}.tgz
 
-
     # ================= Build Sandbox =================
     - name: Build Sandbox Image
       if: steps.detect_pkg.outputs.skip_pipeline == 'false' && steps.ml_scan.outcome == 'failure'
       run: |
         docker build -t ssc-sandbox -f sandbox/Dockerfile .
-
 
     # ================= Dynamic Analysis =================
     - name: Run Dynamic Analysis
@@ -129,7 +130,6 @@ jobs:
           python sandbox/runner.py \
           packages/decoy/package_${{ github.run_number }}.tgz
 
-
     # ================= Publish Benign =================
     - name: Publish Package
       if: steps.detect_pkg.outputs.skip_pipeline == 'false' && steps.ml_scan.outcome == 'success'
@@ -137,7 +137,6 @@ jobs:
         mkdir -p packages/releases
         mv "${{ steps.detect_pkg.outputs.package_path }}" \
            packages/releases/package_${{ github.run_number }}.tgz
-
 
     # ================= Commit Results =================
     - name: Commit Results
