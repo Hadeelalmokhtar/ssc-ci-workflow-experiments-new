@@ -2,245 +2,533 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>SSC Risk Intelligence Dashboard</title>
+<title>SSC Threat Intelligence Dashboard</title>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/dist/vis-network.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/vis-network/styles/vis-network.min.css" rel="stylesheet">
 
 <style>
-body {
-    background:#0f172a;
-    color:white;
-    font-family:Arial;
-    padding:30px;
-}
-.card {
-    background:#1e293b;
-    padding:20px;
-    border-radius:12px;
-    margin-bottom:25px;
-}
-.high { color:#ff4d4d; }
-.medium { color:#ffcc00; }
-.low { color:#4dff88; }
 
-.mitre-tag {
-    background:#111827;
-    padding:8px 12px;
-    margin:6px 0;
-    border-radius:8px;
-    border-left:4px solid #3b82f6;
-    font-size:14px;
+body{
+background:#0f172a;
+color:white;
+font-family:Arial;
+padding:30px;
 }
 
-.timeline-item {
-    border-left:3px solid #3b82f6;
-    padding-left:10px;
-    margin-bottom:10px;
+h1{
+margin-bottom:30px;
 }
+
+.grid{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(420px,1fr));
+gap:25px;
+}
+
+.card{
+background:#1e293b;
+padding:20px;
+border-radius:12px;
+}
+
+.list{
+background:#0b1220;
+padding:10px;
+border-radius:8px;
+margin-top:10px;
+font-size:13px;
+}
+
+.item{
+padding:6px;
+border-bottom:1px solid #1e293b;
+}
+
+.mitre{
+background:#111827;
+padding:8px;
+margin:6px 0;
+border-left:4px solid #3b82f6;
+border-radius:6px;
+}
+
+.timeline{
+border-left:3px solid #3b82f6;
+padding-left:10px;
+margin-bottom:8px;
+}
+
+.high{color:#ff4d4d}
+.medium{color:#ffcc00}
+.low{color:#4dff88}
+
 </style>
 </head>
 
 <body>
 
-<h1>🛡 SSC Risk Intelligence Dashboard</h1>
+<h1>🛡 SSC Threat Intelligence Dashboard</h1>
+
+<div class="grid">
 
 <div class="card">
-    <h2>Threat Score</h2>
-    <canvas id="gauge" height="120"></canvas>
+<h2>Threat Score</h2>
+<canvas id="gauge"></canvas>
 </div>
 
 <div class="card">
-    <h2>Risk Trend (Last Runs)</h2>
-    <canvas id="trendChart" height="80"></canvas>
+<h2>Risk Trend</h2>
+<canvas id="trend"></canvas>
 </div>
 
 <div class="card">
-    <h2>Entropy</h2>
-    <canvas id="entropyChart" height="80"></canvas>
+<h2>Network Activity</h2>
+<canvas id="networkChart"></canvas>
+<div id="networkList" class="list"></div>
 </div>
 
 <div class="card">
-    <h2>Suspicious Indicators</h2>
-    <div id="suspiciousPanel"></div>
-</div>
-
-<!--  MITRE ATT&CK PANEL -->
-<div class="card">
-    <h2> MITRE ATT&CK Mapping</h2>
-    <div id="mitrePanel"></div>
+<h2>Network Graph</h2>
+<div id="networkGraph" style="height:350px;"></div>
 </div>
 
 <div class="card">
-    <h2>Execution Timeline</h2>
-    <div id="timeline"></div>
+<h2>Process Activity</h2>
+<div id="processList" class="list"></div>
+</div>
+
+<div class="card">
+<h2>Process Tree</h2>
+<div id="processTree" style="height:350px;"></div>
+</div>
+
+<div class="card">
+<h2>Filesystem Activity</h2>
+<div id="fsList" class="list"></div>
+</div>
+
+<div class="card">
+<h2>Sensitive Access</h2>
+<div id="sensitiveList" class="list"></div>
+</div>
+
+<div class="card">
+<h2>Commands Detected</h2>
+<div id="commandList" class="list"></div>
+</div>
+
+<div class="card">
+<h2>Syscall Heatmap</h2>
+<canvas id="syscallChart"></canvas>
+</div>
+
+<div class="card">
+<h2>MITRE ATT&CK Matrix</h2>
+<div id="mitrePanel"></div>
+</div>
+
+<div class="card">
+<h2>IOC Indicators</h2>
+<div id="iocPanel" class="list"></div>
+</div>
+
+<div class="card">
+<h2>Attack Path</h2>
+<div id="attackGraph" style="height:350px;"></div>
+</div>
+
+<div class="card">
+<h2>Behavior Comparison</h2>
+<canvas id="comparisonChart"></canvas>
+</div>
+
+<div class="card">
+<h2>Behavior Timeline</h2>
+<div id="timeline"></div>
+</div>
+
 </div>
 
 <script>
 
-let gaugeChart, entropyChart, trendChart;
+let gaugeChart,trendChart,networkChart,syscallChart,comparisonChart;
 
-async function safeFetch(url) {
-    try {
-        const res = await fetch(url + "?t=" + new Date().getTime());
-        if (!res.ok) return null;
-        return await res.json();
-    } catch {
-        return null;
-    }
+async function safeFetch(url){
+try{
+const r=await fetch(url+"?t="+Date.now());
+if(!r.ok) return null;
+return await r.json();
+}catch{
+return null;
+}
 }
 
-async function loadData() {
+async function loadData(){
 
-    const latest = await safeFetch("decoy_logs/latest.json");
-    const history = await safeFetch("decoy_logs/history.json");
+const latest=await safeFetch("decoy_logs/latest.json");
+const history=await safeFetch("decoy_logs/history.json");
 
-    if (!latest) {
-        document.getElementById("suspiciousPanel").innerHTML =
-            "<span class='low'>Waiting for first pipeline run...</span>";
-        return;
-    }
+if(!latest) return;
 
-    renderGauge(latest.behavior_score || 0);
-    renderEntropy(latest.file_entropy || 0);
-    renderTrend(history || []);
+renderGauge(latest.behavior_score||0);
+renderTrend(history||[]);
+renderNetwork(latest.network_activity||{});
+renderNetworkGraph(latest.network_activity||{});
+renderProcesses(latest.process_activity||[]);
+renderProcessTree(latest.process_activity||[]);
+renderFilesystem(latest.filesystem_activity||{});
+renderSensitive(latest.sensitive_access||[]);
+renderCommands(latest.commands_detected||[]);
+renderSyscalls(latest.syscall_stats||{});
+renderMitre(latest.mitre_techniques||[]);
+renderTimeline(latest.timeline||[]);
+renderComparison(history||[]);
 
-    const suspicious = [
-        ...(latest.suspicious_imports || []),
-        ...(latest.command_injection_calls || []),
-        ...(latest.obfuscation_flags || [])
-    ];
+/* NEW FEATURES */
+renderIOC(latest);
+renderAttackPath(latest);
 
-    renderSuspicious(suspicious);
-    renderMitre(latest.mitre_techniques || []);
-
-    const events = (latest.system_calls_detected || []).map(call => ({
-        event: "System Call",
-        detail: call,
-        timestamp: latest.timestamp
-    }));
-
-    renderTimeline(events);
 }
 
-function renderGauge(score) {
+function renderGauge(score){
 
-    if (gaugeChart) gaugeChart.destroy();
+if(gaugeChart) gaugeChart.destroy();
 
-    gaugeChart = new Chart(document.getElementById('gauge'), {
-        type: 'doughnut',
-        data: {
-            labels: ['Risk','Remaining'],
-            datasets: [{
-                data: [score, 10-score],
-                backgroundColor: [
-                    score >= 7 ? '#ff4d4d' :
-                    score >= 4 ? '#ffcc00' : '#4dff88',
-                    '#1e293b'
-                ]
-            }]
-        },
-        options: { cutout: '70%' }
-    });
+gaugeChart=new Chart(document.getElementById("gauge"),{
+type:"doughnut",
+data:{
+labels:["Risk","Remaining"],
+datasets:[{
+data:[score,20-score],
+backgroundColor:[
+score>12?"#ff4d4d":
+score>6?"#ffcc00":"#4dff88",
+"#1e293b"]
+}]
+},
+options:{cutout:"70%"}
+});
+
 }
 
-function renderEntropy(entropy) {
+function renderTrend(history){
 
-    if (entropyChart) entropyChart.destroy();
+if(!history||history.length==0) return;
 
-    entropyChart = new Chart(document.getElementById('entropyChart'), {
-        type:'bar',
-        data:{
-            labels:['Entropy'],
-            datasets:[{
-                label:'Entropy',
-                data:[entropy],
-                backgroundColor:'#3b82f6'
-            }]
-        },
-        options:{ scales:{ y:{ min:0, max:8 } } }
-    });
+if(trendChart) trendChart.destroy();
+
+const labels=history.map(h=>h.run_id);
+const scores=history.map(h=>h.behavior_score);
+
+trendChart=new Chart(document.getElementById("trend"),{
+type:"line",
+data:{
+labels:labels,
+datasets:[{
+label:"Behavior Score",
+data:scores,
+borderColor:"#3b82f6",
+backgroundColor:"rgba(59,130,246,0.2)",
+fill:true
+}]
+}
+});
+
 }
 
-function renderTrend(history) {
+function renderNetwork(net){
 
-    if (!history || history.length === 0) return;
+const list=document.getElementById("networkList");
+list.innerHTML="";
 
-    if (trendChart) trendChart.destroy();
+(net.details||[]).forEach(async n=>{
 
-    const labels = history.map(h => h.run_id);
-    const scores = history.map(h => h.behavior_score);
+let intel="";
 
-    trendChart = new Chart(document.getElementById('trendChart'), {
-        type:'line',
-        data:{
-            labels: labels,
-            datasets:[{
-                label:'Behavior Score',
-                data: scores,
-                borderColor:'#3b82f6',
-                backgroundColor:'rgba(59,130,246,0.2)',
-                fill:true,
-                tension:0.3
-            }]
-        },
-        options:{ scales:{ y:{ min:0, max:10 } } }
-    });
+try{
+const r=await fetch(`http://ip-api.com/json/${n.ip}`);
+const data=await r.json();
+intel=`${data.country} | ${data.org}`;
+}catch{}
+
+list.innerHTML+=`<div class="item">${n.ip}:${n.port}<br><small>${intel}</small></div>`;
+
+});
+
+if(networkChart) networkChart.destroy();
+
+networkChart=new Chart(document.getElementById("networkChart"),{
+type:"bar",
+data:{
+labels:["Connections"],
+datasets:[{
+label:"Connections",
+data:[net.connections||0],
+backgroundColor:"#3b82f6"
+}]
+}
+});
+
 }
 
-function renderSuspicious(list) {
-    const panel = document.getElementById('suspiciousPanel');
-    panel.innerHTML = "";
+function renderNetworkGraph(net){
 
-    if(!list || list.length === 0){
-        panel.innerHTML = "<span class='low'>No suspicious indicators detected</span>";
-        return;
-    }
+const container=document.getElementById("networkGraph");
 
-    list.forEach(item => {
-        panel.innerHTML += `<div class='medium'>⚠ ${item}</div>`;
-    });
+const nodes=[{id:1,label:"Package",color:"#3b82f6"}];
+const edges=[];
+
+let id=2;
+
+(net.details||[]).forEach(n=>{
+nodes.push({id:id,label:n.ip,color:"#ef4444"});
+edges.push({from:1,to:id});
+id++;
+});
+
+new vis.Network(container,{
+nodes:new vis.DataSet(nodes),
+edges:new vis.DataSet(edges)
+},{});
+
 }
 
-function renderMitre(list) {
-    const panel = document.getElementById('mitrePanel');
-    panel.innerHTML = "";
+function renderProcesses(p){
 
-    if(!list || list.length === 0){
-        panel.innerHTML = "<span class='low'>No MITRE techniques mapped</span>";
-        return;
-    }
+const list=document.getElementById("processList");
+list.innerHTML="";
 
-    list.forEach(item => {
-        panel.innerHTML += `
-            <div class="mitre-tag">
-                 ${item}
-            </div>
-        `;
-    });
+p.forEach(proc=>{
+list.innerHTML+=`<div class="item">${proc}</div>`;
+});
+
 }
 
-function renderTimeline(events) {
-    const container = document.getElementById('timeline');
-    container.innerHTML = "";
+function renderProcessTree(p){
 
-    if(!events || events.length === 0){
-        container.innerHTML = "<span class='low'>No significant activity</span>";
-        return;
-    }
+const container=document.getElementById("processTree");
 
-    events.forEach(e => {
-        container.innerHTML += `
-            <div class="timeline-item">
-                <strong>${e.event}</strong><br>
-                ${e.detail}<br>
-                <small>${e.timestamp}</small>
-            </div>
-        `;
-    });
+const nodes=[{id:1,label:"Package"}];
+const edges=[];
+
+let id=2;
+
+p.forEach(proc=>{
+nodes.push({id:id,label:proc,color:"#22c55e"});
+edges.push({from:1,to:id});
+id++;
+});
+
+new vis.Network(container,{
+nodes:new vis.DataSet(nodes),
+edges:new vis.DataSet(edges)
+},{});
+
+}
+
+function renderFilesystem(fs){
+
+const list=document.getElementById("fsList");
+list.innerHTML="";
+
+(fs.files_created||[]).forEach(f=>{
+list.innerHTML+=`<div class="item">Created: ${f}</div>`;
+});
+
+(fs.files_written||[]).forEach(f=>{
+list.innerHTML+=`<div class="item">Written: ${f}</div>`;
+});
+
+(fs.files_deleted||[]).forEach(f=>{
+list.innerHTML+=`<div class="item">Deleted: ${f}</div>`;
+});
+
+}
+
+function renderSensitive(list){
+
+const panel=document.getElementById("sensitiveList");
+panel.innerHTML="";
+
+list.forEach(p=>{
+panel.innerHTML+=`<div class="item high">${p}</div>`;
+});
+
+}
+
+function renderCommands(list){
+
+const panel=document.getElementById("commandList");
+panel.innerHTML="";
+
+list.forEach(c=>{
+panel.innerHTML+=`<div class="item medium">${c}</div>`;
+});
+
+}
+
+function renderSyscalls(stats){
+
+const labels=Object.keys(stats);
+const values=Object.values(stats);
+
+if(syscallChart) syscallChart.destroy();
+
+syscallChart=new Chart(document.getElementById("syscallChart"),{
+type:"bar",
+data:{
+labels:labels,
+datasets:[{
+label:"Syscalls",
+data:values,
+backgroundColor:"#22c55e"
+}]
+}
+});
+
+}
+
+function renderMitre(list){
+
+const panel=document.getElementById("mitrePanel");
+panel.innerHTML="";
+
+list.forEach(m=>{
+panel.innerHTML+=`<div class="mitre">${m}</div>`;
+});
+
+}
+
+function renderTimeline(events){
+
+const container=document.getElementById("timeline");
+container.innerHTML="";
+
+events.slice(0,30).forEach(e=>{
+container.innerHTML+=`
+<div class="timeline">
+<strong>${e.event}</strong><br>
+${e.detail}
+</div>`;
+});
+
+}
+
+function renderIOC(data){
+
+const panel=document.getElementById("iocPanel");
+panel.innerHTML="";
+
+const ips=data.network_activity?.details?.map(x=>x.ip)||[];
+const files=[
+...(data.filesystem_activity?.files_created||[]),
+...(data.filesystem_activity?.files_written||[])
+];
+
+const commands=data.commands_detected||[];
+
+ips.forEach(ip=>{
+panel.innerHTML+=`<div class="item high">IP: ${ip}</div>`;
+});
+
+files.forEach(f=>{
+panel.innerHTML+=`<div class="item medium">File: ${f}</div>`;
+});
+
+commands.forEach(c=>{
+panel.innerHTML+=`<div class="item low">Command: ${c}</div>`;
+});
+
+}
+
+function renderAttackPath(data){
+
+const container=document.getElementById("attackGraph");
+
+const nodes=[];
+const edges=[];
+
+let id=1;
+
+nodes.push({id:id,label:"Package",color:"#3b82f6"});
+const packageNode=id;
+
+id++;
+
+(data.process_activity||[]).forEach(proc=>{
+
+nodes.push({id:id,label:proc,color:"#22c55e"});
+edges.push({from:packageNode,to:id});
+
+const processNode=id;
+id++;
+
+(data.network_activity?.details||[]).forEach(net=>{
+
+nodes.push({id:id,label:net.ip,color:"#ef4444"});
+edges.push({from:processNode,to:id});
+id++;
+
+});
+
+(data.filesystem_activity?.files_created||[]).forEach(f=>{
+
+nodes.push({id:id,label:f,color:"#f59e0b"});
+edges.push({from:processNode,to:id});
+id++;
+
+});
+
+});
+
+new vis.Network(container,{
+nodes:new vis.DataSet(nodes),
+edges:new vis.DataSet(edges)
+},{
+nodes:{shape:"dot",size:18},
+edges:{arrows:"to"}
+});
+
+}
+
+function renderComparison(history){
+
+if(!history||history.length==0) return;
+
+const labels=history.map(h=>h.run_id);
+const net=history.map(h=>h.network_activity?.connections||0);
+const proc=history.map(h=>h.process_activity?.length||0);
+
+if(comparisonChart) comparisonChart.destroy();
+
+comparisonChart=new Chart(
+document.getElementById("comparisonChart"),
+{
+type:"bar",
+data:{
+labels:labels,
+datasets:[
+{
+label:"Network Connections",
+data:net,
+backgroundColor:"#ef4444"
+},
+{
+label:"Processes Spawned",
+data:proc,
+backgroundColor:"#22c55e"
+}
+]
+}
+});
+
 }
 
 loadData();
-setInterval(loadData, 10000);
+setInterval(loadData,8000);
 
 </script>
 
