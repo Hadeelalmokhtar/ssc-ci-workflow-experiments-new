@@ -64,6 +64,7 @@ border-radius:8px;
 Package: <span id="pkg"></span><br>
 Run ID: <span id="run"></span><br>
 Behavior Score: <span id="score"></span><br>
+Malware Family: <span id="family"></span><br>
 Threat Verdict: <span id="verdict"></span>
 
 </div>
@@ -129,6 +130,10 @@ document.getElementById("pkg").textContent=data.package.name
 document.getElementById("run").textContent=data.run_id
 document.getElementById("score").textContent=data.behavior_score
 
+// Malware Family
+document.getElementById("family").textContent =
+data.malware_family_hint || "Unknown"
+
 let verdict=data.threat_verdict
 
 document.getElementById("verdict").innerHTML=
@@ -151,6 +156,8 @@ function renderIOC(data){
 
 let p=document.getElementById("ioc")
 
+p.innerHTML=""
+
 data.ioc.ips.forEach(i=>{
 
 p.innerHTML+=`<div class="item">${i}</div>`
@@ -162,6 +169,8 @@ p.innerHTML+=`<div class="item">${i}</div>`
 function renderNetwork(data){
 
 let p=document.getElementById("net")
+
+p.innerHTML=""
 
 data.network_activity.details.forEach(n=>{
 
@@ -180,6 +189,8 @@ function renderDNS(data){
 
 let p=document.getElementById("dns")
 
+p.innerHTML=""
+
 data.dns_activity.forEach(d=>{
 
 p.innerHTML+=`<div class="item">${d}</div>`
@@ -191,6 +202,8 @@ p.innerHTML+=`<div class="item">${d}</div>`
 function renderProcesses(data){
 
 let p=document.getElementById("proc")
+
+p.innerHTML=""
 
 data.process_activity.forEach(proc=>{
 
@@ -204,6 +217,8 @@ function renderFS(data){
 
 let p=document.getElementById("fs")
 
+p.innerHTML=""
+
 data.filesystem.forEach(f=>{
 
 p.innerHTML+=`<div class="item">${f}</div>`
@@ -215,6 +230,8 @@ p.innerHTML+=`<div class="item">${f}</div>`
 function renderSensitive(data){
 
 let p=document.getElementById("sens")
+
+p.innerHTML=""
 
 data.sensitive_access.forEach(s=>{
 
@@ -228,6 +245,8 @@ function renderMitre(data){
 
 let p=document.getElementById("mitre")
 
+p.innerHTML=""
+
 data.mitre.forEach(m=>{
 
 p.innerHTML+=`<div class="item">${m}</div>`
@@ -239,6 +258,8 @@ p.innerHTML+=`<div class="item">${m}</div>`
 function renderTimeline(data){
 
 let p=document.getElementById("timeline")
+
+p.innerHTML=""
 
 data.timeline.forEach(t=>{
 
