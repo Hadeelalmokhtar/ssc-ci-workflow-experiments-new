@@ -4,6 +4,7 @@ import json
 import subprocess
 import time
 import re
+import hashlib
 from datetime import datetime
 from collections import defaultdict
 
@@ -19,6 +20,20 @@ target_file = sys.argv[1]
 if not os.path.exists(target_file):
     print("File not found:", target_file)
     sys.exit(1)
+
+# ==========================================
+# FILE HASH (IOC)
+# ==========================================
+def file_hash(path):
+    try:
+        h = hashlib.sha256()
+        with open(path,"rb") as f:
+            h.update(f.read())
+        return h.hexdigest()
+    except:
+        return None
+
+package_hash = file_hash(target_file)
 
 # ==========================================
 # RUNTIME CONTAINERS
@@ -86,11 +101,9 @@ for line in stderr.split("\n"):
     if not line.strip():
         continue
 
-    # count syscalls
     syscall = line.split("(")[0].split()[-1]
     syscall_counter[syscall] += 1
 
-    # timeline
     timeline.append({
         "timestamp": datetime.utcnow().isoformat(),
         "event": syscall,
@@ -113,10 +126,12 @@ for line in stderr.split("\n"):
     # NETWORK DETECTION
     # --------------------------------------
     if "connect(" in line:
+
         ip_match = re.search(r'inet_addr\("([^"]+)"\)', line)
         port_match = re.search(r'htons\((\d+)\)', line)
 
         if ip_match:
+
             ip = ip_match.group(1)
             port = port_match.group(1) if port_match else "unknown"
 
@@ -126,11 +141,14 @@ for line in stderr.split("\n"):
             })
 
     # --------------------------------------
-    # FILE SYSTEM ACTIVITY
+    # FILE SYSTEM
     # --------------------------------------
     if "open(" in line or "openat(" in line:
+
         file_match = re.search(r'"([^"]+)"', line)
+
         if file_match:
+
             f = file_match.group(1)
 
             if "O_CREAT" in line:
@@ -144,10 +162,12 @@ for line in stderr.split("\n"):
                     sensitive_access.add(f)
 
     # --------------------------------------
-    # FILE DELETION
+    # FILE DELETE
     # --------------------------------------
     if "unlink(" in line:
+
         match = re.search(r'"([^"]+)"', line)
+
         if match:
             file_deleted.add(match.group(1))
 
@@ -167,7 +187,7 @@ if commands_detected:
     score += 2
 
 # ==========================================
-# MITRE ATT&CK MAPPING
+# MITRE ATT&CK
 # ==========================================
 mitre = []
 
@@ -184,6 +204,46 @@ if file_written:
     mitre.append("T1105 Ingress Tool Transfer")
 
 # ==========================================
+# IOC EXTRACTION
+# ==========================================
+ioc = {
+    "ips": [n["ip"] for n in network_connections],
+    "files_created": list(file_created),
+    "files_written": list(file_written),
+    "commands": list(commands_detected),
+    "package_hash": package_hash
+}
+
+# ==========================================
+# ATTACK PATH
+# ==========================================
+attack_path = []
+
+for proc in spawned_processes:
+
+    attack_path.append({
+        "source":"package",
+        "target":proc,
+        "type":"process"
+    })
+
+    for net in network_connections:
+
+        attack_path.append({
+            "source":proc,
+            "target":net["ip"],
+            "type":"network"
+        })
+
+    for f in file_created:
+
+        attack_path.append({
+            "source":proc,
+            "target":f,
+            "type":"file"
+        })
+
+# ==========================================
 # LOG STRUCTURE
 # ==========================================
 os.makedirs("decoy_logs", exist_ok=True)
@@ -191,8 +251,15 @@ os.makedirs("decoy_logs", exist_ok=True)
 run_id = os.getenv("GITHUB_RUN_NUMBER", str(int(time.time())))
 
 log = {
+
     "run_id": run_id,
-    "package": target_file,
+
+    "package": {
+        "name": os.path.basename(target_file),
+        "path": target_file,
+        "hash": package_hash
+    },
+
     "runtime_seconds": runtime,
 
     "process_activity": list(spawned_processes),
@@ -218,6 +285,10 @@ log = {
 
     "mitre_techniques": mitre,
 
+    "ioc": ioc,
+
+    "attack_path": attack_path,
+
     "timeline": timeline[:50],
 
     "timestamp": datetime.utcnow().isoformat()
@@ -226,6 +297,7 @@ log = {
 # ==========================================
 # SAVE LOGS
 # ==========================================
+
 with open(f"decoy_logs/log_{run_id}.json","w") as f:
     json.dump(log,f,indent=4)
 
