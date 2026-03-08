@@ -50,25 +50,18 @@ jobs:
     - name: Detect Package
       id: detect_pkg
       run: |
-        set +e
 
         PACKAGE=""
 
         echo "Trigger type: ${{ github.event_name }}"
 
-        # ===== Manual run =====
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           PACKAGE="${{ github.event.inputs.package_file }}"
         fi
 
-        # ===== Push detection =====
         if [ -z "$PACKAGE" ]; then
-          echo "Checking changed files..."
 
           FILES=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" 2>/dev/null || true)
-
-          echo "Changed files:"
-          echo "$FILES"
 
           for f in $FILES; do
             if [[ "$f" == *.tgz ]] || [[ "$f" == *.tar.gz ]]; then
@@ -78,13 +71,10 @@ jobs:
           done
         fi
 
-        # ===== Fallback search =====
         if [ -z "$PACKAGE" ]; then
-          echo "Searching repository for package..."
           PACKAGE=$(ls *.tgz *.tar.gz 2>/dev/null | head -n 1 || true)
         fi
 
-        # ===== No package found =====
         if [ -z "$PACKAGE" ]; then
           echo "No package detected → skipping pipeline"
           echo "skip_pipeline=true" >> $GITHUB_OUTPUT
@@ -97,9 +87,7 @@ jobs:
         echo "skip_pipeline=false" >> $GITHUB_OUTPUT
         echo "package_path=$PACKAGE" >> $GITHUB_OUTPUT
 
-        exit 0
-
-    # ================= ML Security Gate =================
+    # ================= ML Scan =================
     - name: ML Security Gate
       id: ml_scan
       if: steps.detect_pkg.outputs.skip_pipeline == 'false'
@@ -108,23 +96,24 @@ jobs:
         export PYTHONPATH=$PYTHONPATH:$(pwd)
         python -m scripts.run_analysis "${{ steps.detect_pkg.outputs.package_path }}"
 
-    # ================= Move to Decoy =================
-    - name: Move to Decoy
-      if: steps.detect_pkg.outputs.skip_pipeline == 'false' && steps.ml_scan.outcome == 'failure'
+    # ================= Move Package to Decoy =================
+    - name: Move Package to Decoy
+      if: steps.detect_pkg.outputs.skip_pipeline == 'false'
       run: |
         mkdir -p packages/decoy
+
         mv "${{ steps.detect_pkg.outputs.package_path }}" \
            packages/decoy/package_${{ github.run_number }}.tgz
 
     # ================= Build Sandbox =================
     - name: Build Sandbox Image
-      if: steps.detect_pkg.outputs.skip_pipeline == 'false' && steps.ml_scan.outcome == 'failure'
+      if: steps.detect_pkg.outputs.skip_pipeline == 'false'
       run: |
         docker build -t ssc-sandbox -f sandbox/Dockerfile .
 
     # ================= Dynamic Analysis =================
     - name: Run Dynamic Analysis
-      if: steps.detect_pkg.outputs.skip_pipeline == 'false' && steps.ml_scan.outcome == 'failure'
+      if: steps.detect_pkg.outputs.skip_pipeline == 'false'
       continue-on-error: true
       run: |
         docker run --rm \
@@ -133,17 +122,46 @@ jobs:
           python sandbox/runner.py \
           packages/decoy/package_${{ github.run_number }}.tgz
 
-    # ================= Publish Benign =================
-    - name: Publish Package
-      if: steps.detect_pkg.outputs.skip_pipeline == 'false' && steps.ml_scan.outcome == 'success'
+    # ================= Decision Engine =================
+    - name: Release Package if Clean
+      if: steps.detect_pkg.outputs.skip_pipeline == 'false'
       run: |
-        mkdir -p packages/releases
-        mv "${{ steps.detect_pkg.outputs.package_path }}" \
-           packages/releases/package_${{ github.run_number }}.tgz
+
+        LOG_FILE="decoy_logs/latest.json"
+
+        if [ ! -f "$LOG_FILE" ]; then
+          echo "No sandbox log found"
+          exit 0
+        fi
+
+        VERDICT=$(python - <<EOF
+import json
+with open("decoy_logs/latest.json") as f:
+    print(json.load(f).get("threat_verdict","UNKNOWN"))
+EOF
+)
+
+        echo "Sandbox verdict: $VERDICT"
+
+        if [ "$VERDICT" = "CLEAN" ]; then
+
+          echo "Package confirmed safe → releasing"
+
+          mkdir -p packages/releases
+
+          mv packages/decoy/package_${{ github.run_number }}.tgz \
+             packages/releases/package_${{ github.run_number }}.tgz
+
+        else
+
+          echo "Package not safe → staying in decoy"
+
+        fi
 
     # ================= Commit Results =================
     - name: Commit Results
       run: |
+
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
 
