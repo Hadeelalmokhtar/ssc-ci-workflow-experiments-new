@@ -125,7 +125,7 @@ jobs:
 
       - name: Release Package if Clean
         if: steps.detect_pkg.outputs.skip_pipeline == 'false'
-        run: |
+        run: | 
 
           LOG_FILE="decoy_logs/latest.json"
 
