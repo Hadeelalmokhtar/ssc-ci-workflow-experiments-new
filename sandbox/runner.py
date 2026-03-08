@@ -3,183 +3,249 @@ import os
 import json
 import subprocess
 import time
-import math
-import ast
 import re
 from datetime import datetime
+from collections import defaultdict
 
-# ==============================
-# Validate Input
-# ==============================
+# ==========================================
+# INPUT VALIDATION
+# ==========================================
 if len(sys.argv) < 2:
-    print("Usage: python runner.py <file_path>")
+    print("Usage: python runner.py <file>")
     sys.exit(1)
 
-file_path = sys.argv[1]
+target_file = sys.argv[1]
 
-if not os.path.exists(file_path):
-    print("File not found:", file_path)
+if not os.path.exists(target_file):
+    print("File not found:", target_file)
     sys.exit(1)
 
-# ==============================
-# 1️ Entropy Calculation
-# ==============================
-def calculate_entropy(data):
-    if not data:
-        return 0
-    prob = [float(data.count(c)) / len(data) for c in set(data)]
-    return -sum(p * math.log2(p) for p in prob)
+# ==========================================
+# RUNTIME CONTAINERS
+# ==========================================
+spawned_processes = set()
+network_connections = []
+file_created = set()
+file_written = set()
+file_deleted = set()
+sensitive_access = set()
+commands_detected = set()
+domains_contacted = set()
+syscall_counter = defaultdict(int)
+timeline = []
 
-with open(file_path, "r", errors="ignore") as f:
-    content = f.read()
+sensitive_paths = [
+    "/etc/passwd",
+    "/etc/shadow",
+    "/root",
+    ".ssh",
+    "/home",
+    "/tmp"
+]
 
-file_entropy = round(calculate_entropy(content), 4)
+suspicious_commands = [
+    "curl","wget","bash","sh","nc","netcat",
+    "chmod","chown","python","node"
+]
 
-# ==============================
-# 2️ AST Analysis
-# ==============================
-suspicious_imports = []
-command_injection = []
-obfuscation_flags = []
-
-danger_modules = ["os", "subprocess", "socket", "requests"]
-danger_functions = ["system", "popen", "exec", "eval"]
-
-tree = ast.parse(content)
-
-for node in ast.walk(tree):
-
-    if isinstance(node, ast.Import):
-        for alias in node.names:
-            if alias.name.split(".")[0] in danger_modules:
-                suspicious_imports.append(alias.name)
-
-    if isinstance(node, ast.ImportFrom):
-        if node.module and node.module.split(".")[0] in danger_modules:
-            suspicious_imports.append(node.module)
-
-    if isinstance(node, ast.Call):
-        if hasattr(node.func, "attr"):
-            if node.func.attr in danger_functions:
-                command_injection.append(node.func.attr)
-
-    if isinstance(node, ast.Constant) and isinstance(node.value, str):
-        if "base64" in node.value.lower():
-            obfuscation_flags.append("base64 usage")
-        if re.search(r'\\x[0-9a-fA-F]{2}', node.value):
-            obfuscation_flags.append("hex encoded string")
-
-# ==============================
-# 3️ Strace Execution
-# ==============================
-print("Starting dynamic execution...")
+# ==========================================
+# STRACE EXECUTION
+# ==========================================
+print("Starting decoy sandbox execution...")
 
 start_time = time.time()
 
+process = subprocess.Popen(
+    [
+        "strace",
+        "-ff",
+        "-tt",
+        "-e",
+        "trace=execve,clone,fork,vfork,open,openat,write,connect,sendto,recvfrom,unlink,rename",
+        "python",
+        target_file
+    ],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True
+)
+
 try:
-    process = subprocess.Popen(
-        ["strace", "-f", "-e", "trace=execve,open,connect,fork",
-         "python", file_path],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
-    )
+    stdout, stderr = process.communicate(timeout=20)
+except subprocess.TimeoutExpired:
+    process.kill()
+    stdout, stderr = process.communicate()
 
-    stdout, stderr = process.communicate(timeout=10)
+runtime = round(time.time() - start_time, 3)
 
-except Exception as e:
-    print("Strace failed:", e)
-    stderr = ""
-    process = subprocess.CompletedProcess([], 0)
-
-execution_time = round(time.time() - start_time, 3)
-
-syscalls_detected = []
+# ==========================================
+# STRACE PARSER
+# ==========================================
 for line in stderr.split("\n"):
-    if any(x in line for x in ["execve", "connect", "open", "fork"]):
-        syscalls_detected.append(line.strip())
 
-# ==============================
-# 4️ Behavior Scoring
-# ==============================
-behavior_score = 0
+    if not line.strip():
+        continue
 
-if file_entropy > 4.5:
-    behavior_score += 2
+    # count syscalls
+    syscall = line.split("(")[0].split()[-1]
+    syscall_counter[syscall] += 1
 
-if suspicious_imports:
-    behavior_score += 2
+    # timeline
+    timeline.append({
+        "timestamp": datetime.utcnow().isoformat(),
+        "event": syscall,
+        "detail": line.strip()
+    })
 
-if command_injection:
-    behavior_score += 3
+    # --------------------------------------
+    # PROCESS DETECTION
+    # --------------------------------------
+    if "execve(" in line:
+        match = re.search(r'execve\("([^"]+)"', line)
+        if match:
+            proc = os.path.basename(match.group(1))
+            spawned_processes.add(proc)
 
-if obfuscation_flags:
-    behavior_score += 2
+            if proc in suspicious_commands:
+                commands_detected.add(proc)
 
-if len(syscalls_detected) > 3:
-    behavior_score += 2
+    # --------------------------------------
+    # NETWORK DETECTION
+    # --------------------------------------
+    if "connect(" in line:
+        ip_match = re.search(r'inet_addr\("([^"]+)"\)', line)
+        port_match = re.search(r'htons\((\d+)\)', line)
 
-# ==============================
-# 5️ MITRE Mapping
-# ==============================
-mitre_techniques = []
+        if ip_match:
+            ip = ip_match.group(1)
+            port = port_match.group(1) if port_match else "unknown"
 
-if command_injection:
-    mitre_techniques.append("T1059 - Command and Scripting Interpreter")
+            network_connections.append({
+                "ip": ip,
+                "port": port
+            })
 
-if obfuscation_flags:
-    mitre_techniques.append("T1027 - Obfuscated Files or Information")
+    # --------------------------------------
+    # FILE SYSTEM ACTIVITY
+    # --------------------------------------
+    if "open(" in line or "openat(" in line:
+        file_match = re.search(r'"([^"]+)"', line)
+        if file_match:
+            f = file_match.group(1)
 
-if suspicious_imports:
-    mitre_techniques.append("T1204 - User Execution")
+            if "O_CREAT" in line:
+                file_created.add(f)
 
-if len(syscalls_detected) > 3:
-    mitre_techniques.append("T1055 - Process Injection")
+            if "O_WRONLY" in line or "O_RDWR" in line:
+                file_written.add(f)
 
-# ==============================
-# 6️ Multi-Log Architecture
-# ==============================
+            for s in sensitive_paths:
+                if s in f:
+                    sensitive_access.add(f)
+
+    # --------------------------------------
+    # FILE DELETION
+    # --------------------------------------
+    if "unlink(" in line:
+        match = re.search(r'"([^"]+)"', line)
+        if match:
+            file_deleted.add(match.group(1))
+
+# ==========================================
+# BEHAVIOR SCORING
+# ==========================================
+score = 0
+
+score += min(len(network_connections),5)
+score += min(len(spawned_processes),3)
+score += min(len(file_written),3)
+
+if sensitive_access:
+    score += 3
+
+if commands_detected:
+    score += 2
+
+# ==========================================
+# MITRE ATT&CK MAPPING
+# ==========================================
+mitre = []
+
+if commands_detected:
+    mitre.append("T1059 Command and Scripting Interpreter")
+
+if network_connections:
+    mitre.append("T1071 Application Layer Protocol")
+
+if sensitive_access:
+    mitre.append("T1005 Data from Local System")
+
+if file_written:
+    mitre.append("T1105 Ingress Tool Transfer")
+
+# ==========================================
+# LOG STRUCTURE
+# ==========================================
 os.makedirs("decoy_logs", exist_ok=True)
 
 run_id = os.getenv("GITHUB_RUN_NUMBER", str(int(time.time())))
 
-dynamic_log = {
+log = {
     "run_id": run_id,
-    "package": file_path,
-    "file_entropy": file_entropy,
-    "execution_time": execution_time,
-    "suspicious_imports": suspicious_imports,
-    "command_injection_calls": command_injection,
-    "obfuscation_flags": obfuscation_flags,
-    "system_calls_detected": syscalls_detected[:20],
-    "behavior_score": behavior_score,
-    "mitre_techniques": mitre_techniques,
+    "package": target_file,
+    "runtime_seconds": runtime,
+
+    "process_activity": list(spawned_processes),
+
+    "network_activity": {
+        "connections": len(network_connections),
+        "details": network_connections
+    },
+
+    "filesystem_activity": {
+        "files_created": list(file_created),
+        "files_written": list(file_written),
+        "files_deleted": list(file_deleted)
+    },
+
+    "sensitive_access": list(sensitive_access),
+
+    "commands_detected": list(commands_detected),
+
+    "syscall_stats": dict(syscall_counter),
+
+    "behavior_score": score,
+
+    "mitre_techniques": mitre,
+
+    "timeline": timeline[:50],
+
     "timestamp": datetime.utcnow().isoformat()
 }
 
-# Unique log
-with open(f"decoy_logs/log_{run_id}.json", "w") as f:
-    json.dump(dynamic_log, f, indent=4)
+# ==========================================
+# SAVE LOGS
+# ==========================================
+with open(f"decoy_logs/log_{run_id}.json","w") as f:
+    json.dump(log,f,indent=4)
 
-# Update latest.json
-with open("decoy_logs/latest.json", "w") as f:
-    json.dump(dynamic_log, f, indent=4)
+with open("decoy_logs/latest.json","w") as f:
+    json.dump(log,f,indent=4)
 
-# Update history.json
-history_path = "decoy_logs/history.json"
+history_path="decoy_logs/history.json"
 
 if os.path.exists(history_path):
-    with open(history_path, "r") as f:
-        history = json.load(f)
+    with open(history_path,"r") as f:
+        history=json.load(f)
 else:
-    history = []
+    history=[]
 
-history.append(dynamic_log)
+history.append(log)
 
-with open(history_path, "w") as f:
-    json.dump(history[-50:], f, indent=4)
+with open(history_path,"w") as f:
+    json.dump(history[-50:],f,indent=4)
 
-print("Dynamic multi-log updated successfully.")
-print("Behavior Score:", behavior_score)
+print("Decoy analysis complete.")
+print("Behavior score:",score)
 
 sys.exit(0)
